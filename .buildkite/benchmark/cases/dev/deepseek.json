@@ -26,7 +26,7 @@
           "MODEL_IMPL_TYPE": "vllm",
           "NEW_MODEL_DESIGN": "1",
           "TPU_BACKEND_TYPE": "jax",
-          "VLLM_MLA_DISABLE": "1",
+          "VLLM_MLA_DISABLE": "0",
           "MOE_REQUANTIZE_BLOCK_SIZE": "512",
           "MOE_REQUANTIZE_WEIGHT_DTYPE": "fp4"
         },
