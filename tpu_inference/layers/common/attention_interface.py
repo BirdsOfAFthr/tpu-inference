@@ -36,8 +36,7 @@ from tpu_inference.kernels.mla.v2.tuned_params import (TuningKey,
 from tpu_inference.layers.common.attention_metadata import AttentionMetadata
 from tpu_inference.layers.common.sharding import ShardingAxisName
 from tpu_inference.logger import init_logger
-from tpu_inference.utils import (get_dtype_packing, get_megacore,
-                                 get_mesh_shape_product)
+from tpu_inference.utils import get_megacore, get_mesh_shape_product
 
 logger = init_logger(__name__)
 
@@ -548,9 +547,6 @@ def mla_attention(
             actual_num_q_heads=q.shape[0],
             actual_lkv_dim=q.shape[2],
             actual_r_dim=q_rope.shape[2],
-            kv_dtype=str(cache.dtype),
-            q_dtype=str(q.dtype),
-            kv_packing=get_dtype_packing(cache.dtype),
             max_num_seqs=md.padded_num_reqs // dp_size,
             pages_per_seq=args[1].shape[1],
         )
