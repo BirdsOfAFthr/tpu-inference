@@ -153,34 +153,37 @@ class MlaKernelTuner(KernelTunerBase):
         # The tuningKey and tunableParams in this list is constructed based on the real kernel execution logs during benchmarking.
         # The tunableParams currently represent the baseline configuration from the attention_interface.py.
         # From the log, only the max_num_tokens is different across different cases
-        for max_num_tokens in [4, 8, 16, 32, 64, 128, 160, 256, 512]:
-            tuning_set_from_log.append([
-                TuningKey(
-                    max_num_tokens=max_num_tokens,
-                    actual_num_q_heads=128,
-                    actual_lkv_dim=512,
-                    actual_r_dim=64,
-                    kv_dtype="float8_e4m3fn",
-                    q_dtype="float8_e4m3fn",
-                    total_num_pages=1506,
-                    page_size_per_kv_packing=256,
-                    kv_packing=4,
-                    max_num_seqs=160,
-                    pages_per_seq=9,
-                    s_dtype="bfloat16",
-                    case="batched_decode",
-                    soft_cap=None,
-                    chunk_prefill_size=None,
-                    sliding_window=None,
-                    p_same_dtype_as_v=True,
-                ),
-                TunableParams(
-                    decode_batch_size=4,
-                    num_kv_pages_per_block=3,
-                    num_queries_per_block=1,
-                    vmem_limit_bytes=64 * 1024 * 1024,
-                )
-            ])
+        for max_num_seqs in [8, 160]:
+            for max_num_tokens in [4, 8, 16, 32, 64, 128, 160, 256, 512]:
+                if max_num_tokens > max_num_seqs:
+                    continue
+                tuning_set_from_log.append([
+                    TuningKey(
+                        max_num_tokens=max_num_tokens,
+                        actual_num_q_heads=128,
+                        actual_lkv_dim=512,
+                        actual_r_dim=64,
+                        kv_dtype="float8_e4m3fn",
+                        q_dtype="float8_e4m3fn",
+                        total_num_pages=1506,
+                        page_size_per_kv_packing=256,
+                        kv_packing=4,
+                        max_num_seqs=max_num_seqs,
+                        pages_per_seq=9,
+                        s_dtype="bfloat16",
+                        case="batched_decode",
+                        soft_cap=None,
+                        chunk_prefill_size=None,
+                        sliding_window=None,
+                        p_same_dtype_as_v=True,
+                    ),
+                    TunableParams(
+                        decode_batch_size=4,
+                        num_kv_pages_per_block=3,
+                        num_queries_per_block=1,
+                        vmem_limit_bytes=64 * 1024 * 1024,
+                    )
+                ])
 
         tuning_cases = []
         for tuning_key, baseline_tunable_params in tuning_set_from_log:
