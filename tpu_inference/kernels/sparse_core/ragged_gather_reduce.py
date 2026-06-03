@@ -119,6 +119,7 @@ def main_kernel(
     subcore_axis_name: str,
     num_row_partitions: int,
     num_column_partitions: int,
+    dense_mode: bool = False,
 ):
     tpu_info = pltpu.get_tpu_info()
     sc_info = tpu_info.sparse_core
@@ -176,13 +177,14 @@ def main_kernel(
                 row_block_id == 0, -1,
                 dst_indices_vmem_ref[...][num_simd_lanes - 1])
             dma_list = []
-            dma_list.append(
-                pltpu.make_async_copy(
-                    sorted_by_validity_hbm_ref.at[pl.ds(
-                        row_tile_start, num_simd_lanes)],
-                    sorted_by_validity_vmem_ref,
-                    recv_sem,
-                ))
+            if not dense_mode:
+                dma_list.append(
+                    pltpu.make_async_copy(
+                        sorted_by_validity_hbm_ref.at[pl.ds(
+                            row_tile_start, num_simd_lanes)],
+                        sorted_by_validity_vmem_ref,
+                        recv_sem,
+                    ))
             dma_list.append(
                 pltpu.make_async_copy(
                     dst_indices_hbm_ref.at[pl.ds(row_tile_start,
@@ -194,18 +196,34 @@ def main_kernel(
             jax.tree.map(lambda x: x.wait(), dma_list)
 
             dma_list = []
-            dma_list.append(
-                pltpu.make_async_copy(
-                    topk_weights_hbm_ref.at[sorted_by_validity_vmem_ref],
-                    topk_weights_vmem_ref,
-                    recv_sem,
-                ))
-            dma_list.append(
-                pltpu.make_async_copy(
-                    indices_hbm_ref.at[sorted_by_validity_vmem_ref],
-                    src_indices_vmem_ref,
-                    recv_sem,
-                ))
+            if dense_mode:
+                dma_list.append(
+                    pltpu.make_async_copy(
+                        topk_weights_hbm_ref.at[pl.ds(row_tile_start,
+                                                      num_simd_lanes)],
+                        topk_weights_vmem_ref,
+                        recv_sem,
+                    ))
+                dma_list.append(
+                    pltpu.make_async_copy(
+                        indices_hbm_ref.at[pl.ds(row_tile_start,
+                                                 num_simd_lanes)],
+                        src_indices_vmem_ref,
+                        recv_sem,
+                    ))
+            else:
+                dma_list.append(
+                    pltpu.make_async_copy(
+                        topk_weights_hbm_ref.at[sorted_by_validity_vmem_ref],
+                        topk_weights_vmem_ref,
+                        recv_sem,
+                    ))
+                dma_list.append(
+                    pltpu.make_async_copy(
+                        indices_hbm_ref.at[sorted_by_validity_vmem_ref],
+                        src_indices_vmem_ref,
+                        recv_sem,
+                    ))
             jax.tree.map(lambda x: x.start(), dma_list)
             jax.tree.map(lambda x: x.wait(), dma_list)
 
@@ -475,7 +493,10 @@ def ragged_gather_reduce(
     assert (valid_rows_mask.ndim == 1
             ), "ragged_gather_reduce only supports 1d valid_rows_mask."
 
-    sc_info = pltpu.get_tpu_info().sparse_core
+    try:
+        sc_info = pltpu.get_tpu_info().sparse_core
+    except ValueError:
+        sc_info = None
     if sc_info is None:
         return _fallback_implementation(x, indices, topk_weights,
                                         valid_rows_mask, reduce_group_size)
@@ -552,6 +573,7 @@ def ragged_gather_reduce(
             subcore_axis_name=vector_mesh.subcore_axis_name,
             num_row_partitions=num_row_partitions,
             num_column_partitions=num_column_partitions,
+            dense_mode=False,
         ),
         out_shape=jax.ShapeDtypeStruct(
             (x.shape[0] // reduce_group_size, x.shape[1]),
@@ -589,3 +611,132 @@ def ragged_gather_reduce(
         out.astype(x.dtype),
         jnp.zeros_like(out, dtype=x.dtype),
     )[:(input_size // reduce_group_size), :hidden_size]
+
+
+@jax.jit(static_argnames=("reduce_group_size", ))
+def dense_gather_reduce(
+    x: jax.Array,
+    indices: jax.Array,
+    topk_weights: jax.Array,
+    reduce_group_size: int,
+) -> jax.Array:
+    """Gathers `x` according to `indices`, applies weights, and reduces (dense TP path).
+
+  This function performs a gathered lookup from `x` using `indices`, scales the
+  obtained rows by `topk_weights`, and then groups every `reduce_group_size` rows
+  together and reduces them via summation. All rows are assumed valid (dense).
+
+  Args:
+    x: A 2D JAX array of input features with shape `(input_size, hidden_size)`.
+    indices: A 1D JAX array of indices to gather with shape `(input_size,)`.
+    topk_weights: A 1D JAX array of weights to scale the gathered rows with
+      shape `(input_size,)`.
+    reduce_group_size: An integer representing the number of consecutive rows to
+      reduce (sum) together.
+
+  Returns:
+    A 2D JAX array of reduced data with shape
+    `(input_size // reduce_group_size, hidden_size)`.
+  """
+    assert x.ndim == 2, "dense_gather_reduce only supports 2d inputs."
+    assert indices.ndim == 1, "dense_gather_reduce only supports 1d indices."
+    assert (topk_weights.ndim == 1
+            ), "dense_gather_reduce only supports 1d topk_weights."
+
+    try:
+        sc_info = pltpu.get_tpu_info().sparse_core
+    except ValueError:
+        sc_info = None
+    if sc_info is None:
+        valid_rows_mask = jnp.ones_like(indices, dtype=jnp.bool_)
+        return _fallback_implementation(x, indices, topk_weights,
+                                        valid_rows_mask, reduce_group_size)
+
+    # Heuristic threshold on whether to fallback for small inputs.
+    dtype = x.dtype
+    dtype_bytes = jax.dtypes.itemsize_bits(dtype) // 8
+    if (jnp.size(x) * dtype_bytes * 2
+            < pltpu.get_tpu_info().vmem_capacity_bytes * 0.6):
+        valid_rows_mask = jnp.ones_like(indices, dtype=jnp.bool_)
+        return _fallback_implementation(x, indices, topk_weights,
+                                        valid_rows_mask, reduce_group_size)
+
+    hidden_size = x.shape[-1]
+    input_size = indices.size
+    num_simd_lanes = sc_info.num_lanes
+    num_cores = sc_info.num_cores * sc_info.num_subcores
+
+    num_column_partitions = _calculate_num_col_column_partitions(
+        hidden_size, num_cores,
+        pltpu.get_tpu_info().num_lanes)
+    assert num_cores % num_column_partitions == 0
+    num_row_partitions = num_cores // num_column_partitions
+
+    dummy_valid_rows_mask = jnp.ones_like(indices, dtype=jnp.bool_)
+    x, indices, topk_weights, _ = _pad_inputs_if_needed(
+        x,
+        indices,
+        topk_weights,
+        dummy_valid_rows_mask,
+        reduce_group_size,
+        num_column_partitions,
+        num_row_partitions,
+        num_simd_lanes,
+    )
+    col_size = x.shape[-1] // num_column_partitions
+
+    padded_input_size = indices.size
+    row_partition_size = padded_input_size // num_row_partitions
+    dst_indices = jnp.arange(padded_input_size,
+                             dtype=jnp.int32) // reduce_group_size
+    num_src_rows_per_row_partition = jnp.full((num_simd_lanes, ),
+                                              row_partition_size,
+                                              dtype=jnp.int32)
+
+    vector_mesh = plsc.VectorSubcoreMesh(
+        num_cores=sc_info.num_cores,
+        num_subcores=sc_info.num_subcores,
+        core_axis_name="core",
+        subcore_axis_name="subcore",
+    )
+
+    out = pl.kernel(
+        functools.partial(
+            main_kernel,
+            core_axis_name=vector_mesh.core_axis_name,
+            subcore_axis_name=vector_mesh.subcore_axis_name,
+            num_row_partitions=num_row_partitions,
+            num_column_partitions=num_column_partitions,
+            dense_mode=True,
+        ),
+        out_shape=jax.ShapeDtypeStruct(
+            (x.shape[0] // reduce_group_size, x.shape[1]),
+            jnp.float32,
+        ),
+        compiler_params=pltpu.CompilerParams(
+            use_tc_tiling_on_sc=True,
+            disable_bounds_checks=True,
+        ),
+        scratch_shapes=[
+            pltpu.VMEM((num_simd_lanes, ), jnp.int32),
+            pltpu.VMEM((num_simd_lanes, col_size), jnp.uint32),
+            pltpu.VMEM((1, col_size), jnp.uint32),
+            pltpu.VMEM((num_simd_lanes, ), jnp.int32),
+            pltpu.VMEM((num_simd_lanes, ), jnp.int32),
+            pltpu.VMEM((num_simd_lanes, ), jnp.float32),
+            pltpu.VMEM((num_simd_lanes, ), jnp.int32),
+            pltpu.SemaphoreType.DMA((2, )),
+        ],
+        mesh=vector_mesh,
+        name="sc_dense_gather_reduce",
+    )(
+        num_src_rows_per_row_partition,
+        x,
+        indices,
+        dst_indices,
+        topk_weights.astype(jnp.float32),
+        indices,  # dummy sorted_by_validity
+    )
+
+    return out.astype(x.dtype)[:(input_size //
+                                 reduce_group_size), :hidden_size]
