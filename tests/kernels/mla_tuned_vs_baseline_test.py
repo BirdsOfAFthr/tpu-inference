@@ -102,17 +102,20 @@ class MlaTunedVsBaselinePerformanceTest(jtu.JaxTestCase):
         print(f"Compiling tuned kernel for: {key}...")
         jax.block_until_ready(run_kernel(tuned_params))
 
+        # 4. Measure Baseline Latency
         iters = 50
         start_ns = time.perf_counter_ns()
         for _ in range(iters):
             jax.block_until_ready(run_kernel(baseline_params))
         baseline_latency = (time.perf_counter_ns() - start_ns) / iters
 
+        # 5. Measure Tuned Latency
         start_ns = time.perf_counter_ns()
         for _ in range(iters):
             jax.block_until_ready(run_kernel(tuned_params))
         tuned_latency = (time.perf_counter_ns() - start_ns) / iters
 
+        # Calculate speedup
         speedup = (baseline_latency - tuned_latency) / baseline_latency * 100
 
         print("\n" + "=" * 80)
@@ -128,6 +131,7 @@ class MlaTunedVsBaselinePerformanceTest(jtu.JaxTestCase):
         print(f"Speedup: {speedup:+.2f}%")
         print("=" * 80 + "\n")
 
+        # Assert no regression (within 5% noise tolerance)
         self.assertLessEqual(
             tuned_latency, baseline_latency * 1.05,
             f"Regression detected! Tuned latency ({tuned_latency / 1e3:.2f} us) "
