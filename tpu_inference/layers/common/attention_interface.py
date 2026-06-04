@@ -557,7 +557,7 @@ def mla_attention(
             page_size_per_kv_packing=cache.shape[1],
             kv_packing=cache.shape[2],
             max_num_seqs=md.padded_num_reqs // dp_size,
-            pages_per_seq=args[1].shape[1],
+            pages_per_seq=args[1].shape[0] // args[0].shape[0],
         )
         batched_decode_tuned_params = get_tuned_params(
             batched_decode_tuning_key)
