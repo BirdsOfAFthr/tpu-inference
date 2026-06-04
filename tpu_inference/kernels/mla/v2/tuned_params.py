@@ -174,19 +174,232 @@ tuned_params_mapping: dict[TuningKey, TunableParams] = {
         num_queries_per_block=1,
         vmem_limit_bytes=62914560,
     ),
+    # Tuned parameters for Mistral-Large-3 on TPU v7x-16 (page_size=1024, kv_packing=32, max_num_seqs=8):
+    TuningKey(
+        case="batched_decode",
+        max_num_tokens=4,
+        actual_num_q_heads=128,
+        actual_lkv_dim=512,
+        actual_r_dim=64,
+        total_num_pages=655,
+        page_size_per_kv_packing=32,
+        kv_packing=32,
+        max_num_seqs=8,
+        pages_per_seq=3,
+    ):
+    TunableParams(
+        decode_batch_size=1,
+        num_kv_pages_per_block=1,
+        num_queries_per_block=1,
+        vmem_limit_bytes=62914560,
+    ),
+    TuningKey(
+        case="batched_decode",
+        max_num_tokens=8,
+        actual_num_q_heads=128,
+        actual_lkv_dim=512,
+        actual_r_dim=64,
+        total_num_pages=655,
+        page_size_per_kv_packing=32,
+        kv_packing=32,
+        max_num_seqs=8,
+        pages_per_seq=3,
+    ):
+    TunableParams(
+        decode_batch_size=1,
+        num_kv_pages_per_block=3,
+        num_queries_per_block=1,
+        vmem_limit_bytes=62914560,
+    ),
+    TuningKey(
+        case="batched_decode",
+        max_num_tokens=16,
+        actual_num_q_heads=128,
+        actual_lkv_dim=512,
+        actual_r_dim=64,
+        total_num_pages=655,
+        page_size_per_kv_packing=32,
+        kv_packing=32,
+        max_num_seqs=8,
+        pages_per_seq=3,
+    ):
+    TunableParams(
+        decode_batch_size=1,
+        num_kv_pages_per_block=3,
+        num_queries_per_block=1,
+        vmem_limit_bytes=62914560,
+    ),
+    TuningKey(
+        case="batched_decode",
+        max_num_tokens=32,
+        actual_num_q_heads=128,
+        actual_lkv_dim=512,
+        actual_r_dim=64,
+        total_num_pages=655,
+        page_size_per_kv_packing=32,
+        kv_packing=32,
+        max_num_seqs=8,
+        pages_per_seq=3,
+    ):
+    TunableParams(
+        decode_batch_size=1,
+        num_kv_pages_per_block=3,
+        num_queries_per_block=1,
+        vmem_limit_bytes=62914560,
+    ),
+    TuningKey(
+        case="batched_decode",
+        max_num_tokens=64,
+        actual_num_q_heads=128,
+        actual_lkv_dim=512,
+        actual_r_dim=64,
+        total_num_pages=655,
+        page_size_per_kv_packing=32,
+        kv_packing=32,
+        max_num_seqs=8,
+        pages_per_seq=3,
+    ):
+    TunableParams(
+        decode_batch_size=1,
+        num_kv_pages_per_block=3,
+        num_queries_per_block=1,
+        vmem_limit_bytes=62914560,
+    ),
+    TuningKey(
+        case="batched_decode",
+        max_num_tokens=128,
+        actual_num_q_heads=128,
+        actual_lkv_dim=512,
+        actual_r_dim=64,
+        total_num_pages=655,
+        page_size_per_kv_packing=32,
+        kv_packing=32,
+        max_num_seqs=8,
+        pages_per_seq=3,
+    ):
+    TunableParams(
+        decode_batch_size=2,
+        num_kv_pages_per_block=3,
+        num_queries_per_block=1,
+        vmem_limit_bytes=62914560,
+    ),
+    TuningKey(
+        case="batched_decode",
+        max_num_tokens=160,
+        actual_num_q_heads=128,
+        actual_lkv_dim=512,
+        actual_r_dim=64,
+        total_num_pages=655,
+        page_size_per_kv_packing=32,
+        kv_packing=32,
+        max_num_seqs=8,
+        pages_per_seq=3,
+    ):
+    TunableParams(
+        decode_batch_size=1,
+        num_kv_pages_per_block=3,
+        num_queries_per_block=1,
+        vmem_limit_bytes=62914560,
+    ),
+    TuningKey(
+        case="batched_decode",
+        max_num_tokens=256,
+        actual_num_q_heads=128,
+        actual_lkv_dim=512,
+        actual_r_dim=64,
+        total_num_pages=655,
+        page_size_per_kv_packing=32,
+        kv_packing=32,
+        max_num_seqs=8,
+        pages_per_seq=3,
+    ):
+    TunableParams(
+        decode_batch_size=8,
+        num_kv_pages_per_block=1,
+        num_queries_per_block=1,
+        vmem_limit_bytes=62914560,
+    ),
+    TuningKey(
+        case="batched_decode",
+        max_num_tokens=512,
+        actual_num_q_heads=128,
+        actual_lkv_dim=512,
+        actual_r_dim=64,
+        total_num_pages=655,
+        page_size_per_kv_packing=32,
+        kv_packing=32,
+        max_num_seqs=8,
+        pages_per_seq=3,
+    ):
+    TunableParams(
+        decode_batch_size=2,
+        num_kv_pages_per_block=3,
+        num_queries_per_block=1,
+        vmem_limit_bytes=62914560,
+    ),
+    TuningKey(
+        case="batched_decode",
+        max_num_tokens=1024,
+        actual_num_q_heads=128,
+        actual_lkv_dim=512,
+        actual_r_dim=64,
+        total_num_pages=655,
+        page_size_per_kv_packing=32,
+        kv_packing=32,
+        max_num_seqs=8,
+        pages_per_seq=3,
+    ):
+    TunableParams(
+        decode_batch_size=4,
+        num_kv_pages_per_block=3,
+        num_queries_per_block=1,
+        vmem_limit_bytes=62914560,
+    ),
+    TuningKey(
+        case="batched_decode",
+        max_num_tokens=2048,
+        actual_num_q_heads=128,
+        actual_lkv_dim=512,
+        actual_r_dim=64,
+        total_num_pages=655,
+        page_size_per_kv_packing=32,
+        kv_packing=32,
+        max_num_seqs=8,
+        pages_per_seq=3,
+    ):
+    TunableParams(
+        decode_batch_size=1,
+        num_kv_pages_per_block=3,
+        num_queries_per_block=1,
+        vmem_limit_bytes=62914560,
+    ),
 }
 
 
 def get_tuned_params(tuning_key: TuningKey) -> TunableParams:
+    # 1. Try exact lookup
     if tuning_key in tuned_params_mapping:
         return tuned_params_mapping[tuning_key]
-    else:
-        logger.warning(
-            f"No tuned parameters found for the given tuning key: {tuning_key}, using default parameters"
-        )
-        return TunableParams(
-            decode_batch_size=4,
-            num_kv_pages_per_block=3,
-            num_queries_per_block=1,
-            vmem_limit_bytes=62914560,
-        )
+
+    # 2. Fallback to core fields match (ignoring page capacity / layout details)
+    for key, params in tuned_params_mapping.items():
+        if (key.case == tuning_key.case
+                and key.max_num_tokens == tuning_key.max_num_tokens
+                and key.actual_num_q_heads == tuning_key.actual_num_q_heads
+                and key.actual_lkv_dim == tuning_key.actual_lkv_dim
+                and key.actual_r_dim == tuning_key.actual_r_dim):
+            logger.info(
+                f"Found core-matched tuned parameters for {tuning_key} (from exact key: {key})"
+            )
+            return params
+
+    # 3. Fallback to general default
+    logger.warning(
+        f"No tuned parameters found for the given tuning key: {tuning_key}, using default parameters"
+    )
+    return TunableParams(
+        decode_batch_size=4,
+        num_kv_pages_per_block=3,
+        num_queries_per_block=1,
+        vmem_limit_bytes=62914560,
+    )
