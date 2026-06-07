@@ -198,7 +198,8 @@ def moe_gmm_local(x: jax.Array,
                   enable_rs_kernel: bool = False,
                   onehot_moe_permute_threshold: int = 0,
                   scatter_results: bool = False,
-                  moe_chunk_size: int = 0) -> jax.Array:
+                  moe_chunk_size: int = 0,
+                  use_ep: bool = False) -> jax.Array:
     """Main MoE logic on a local shard can run in TP or EP mode.
 
     Set parallelism for "tp" or "ep"
@@ -209,7 +210,7 @@ def moe_gmm_local(x: jax.Array,
     # Define your custom hardcoded tiling configs directly here (e.g., TileSizes(tile_m=128, tile_k=128, tile_n=128))
     m = x.shape[0]
     is_decode = (m <= 512)
-    if is_decode:
+    if is_decode or use_ep:
         # decode tiling config
         gmm1_tiling = calculate_tiling
         gmm2_tiling = calculate_tiling
@@ -523,6 +524,7 @@ def expert_parallel_gmm(
             enable_rs_kernel=enable_rs_kernel,
             scatter_results=scatter_results,
             moe_chunk_size=moe_chunk_size,
+            use_ep=True,
         ),
         mesh=mesh,
         in_specs=(
