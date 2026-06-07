@@ -378,6 +378,9 @@ tuned_params_mapping: dict[TuningKey, TunableParams] = {
 
 def get_tuned_params(tuning_key: TuningKey) -> TunableParams:
     if tuning_key in tuned_params_mapping:
+        logger.warning(
+            f"amanda using tuned params"
+        )
         return tuned_params_mapping[tuning_key]
     else:
         logger.warning(
