@@ -175,19 +175,6 @@ class MlaKernelTuner(KernelTunerBase):
             tuning_set_from_log.append([
                 TuningKey(
                     max_num_tokens=max_num_tokens,
-<<<<<<< HEAD
-                    actual_num_q_heads=flags.FLAGS.mla_actual_num_q_heads,
-                    actual_lkv_dim=flags.FLAGS.mla_actual_lkv_dim,
-                    actual_r_dim=flags.FLAGS.mla_actual_r_dim,
-                    kv_dtype=flags.FLAGS.mla_kv_dtype,
-                    q_dtype=flags.FLAGS.mla_q_dtype,
-                    total_num_pages=flags.FLAGS.mla_total_num_pages,
-                    page_size_per_kv_packing=flags.FLAGS.
-                    mla_page_size_per_kv_packing,
-                    kv_packing=flags.FLAGS.mla_kv_packing,
-                    max_num_seqs=flags.FLAGS.mla_max_num_seqs,
-                    pages_per_seq=flags.FLAGS.mla_pages_per_seq,
-=======
                     actual_num_q_heads=128,
                     actual_lkv_dim=512,
                     actual_r_dim=64,
@@ -198,7 +185,6 @@ class MlaKernelTuner(KernelTunerBase):
                     kv_packing=32,
                     max_num_seqs=8,
                     pages_per_seq=3,
->>>>>>> e50dd647 (feat(mla): update mla_kernel_tuner keys with Mistral-Large-3 shape parameters)
                     s_dtype="bfloat16",
                     case="batched_decode",
                     soft_cap=None,
@@ -276,7 +262,7 @@ class MlaKernelTuner(KernelTunerBase):
             tuning_key: TuningKey,
             tunable_params: TunableParams,
             iters: int = 1) -> tuple[TuningStatus, float, float]:
-        iters=1000
+        iters = 1000
         logger.debug(
             f"Running mla kernel with tuning_key={tuning_key}, tunable_params={tunable_params}, iters={iters}"
         )
