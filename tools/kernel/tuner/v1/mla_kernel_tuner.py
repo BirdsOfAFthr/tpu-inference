@@ -276,6 +276,7 @@ class MlaKernelTuner(KernelTunerBase):
             tuning_key: TuningKey,
             tunable_params: TunableParams,
             iters: int = 1) -> tuple[TuningStatus, float, float]:
+        iters=1000
         logger.debug(
             f"Running mla kernel with tuning_key={tuning_key}, tunable_params={tunable_params}, iters={iters}"
         )
