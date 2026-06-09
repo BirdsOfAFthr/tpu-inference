@@ -33,7 +33,12 @@ import torch
 import torch.nn as nn
 from vllm.config import VllmConfig
 from vllm.model_executor.models.utils import extract_layer_index
-from vllm.models.deepseek_v4.attention import DeepseekV4Attention
+
+try:
+    from vllm.models.deepseek_v4.attention import DeepseekV4Attention
+except ImportError:
+    from vllm.models.deepseek_v4.attention import DeepseekV4MLAAttention as DeepseekV4Attention
+
 from vllm.v1.attention.backend import AttentionBackend
 from vllm.v1.kv_cache_interface import KVCacheSpec, MLAAttentionSpec
 

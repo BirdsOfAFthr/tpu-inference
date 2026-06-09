@@ -24,8 +24,13 @@ from vllm.model_executor.layers.attention import Attention
 from vllm.model_executor.layers.attention_layer_base import AttentionLayerBase
 from vllm.model_executor.layers.mamba.abstract import MambaBase
 from vllm.model_executor.layers.mla import MLAAttention
-from vllm.models.deepseek_v4.attention import (DeepseekV4Attention,
-                                               DeepseekV4IndexerCache)
+
+try:
+    from vllm.models.deepseek_v4.attention import DeepseekV4Attention
+except ImportError:
+    from vllm.models.deepseek_v4.attention import DeepseekV4MLAAttention as DeepseekV4Attention
+
+from vllm.models.deepseek_v4.attention import DeepseekV4IndexerCache
 from vllm.models.deepseek_v4.compressor import CompressorStateCache
 from vllm.v1.attention.backend import AttentionType
 from vllm.v1.attention.backends.mla.sparse_swa import DeepseekV4SWACache
