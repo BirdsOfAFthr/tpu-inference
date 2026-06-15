@@ -37,31 +37,21 @@ def is_compatible(
 ) -> bool:
     """Checks if the inputs are compatible with the SparseCore Pallas kernel."""
     if op.dtype != jnp.bfloat16 and op.dtype != jnp.float32:
-        print(f"amanda: Dtype {op.dtype} not compatible")
         return False
     if op.shape[0] % reduce_group_size != 0:
-        print(f"amanda: {op.shape[0]} not divisible by {reduce_group_size}")
         return False
 
     sc_info = pltpu.get_tpu_info().sparse_core
     if sc_info is None:
-        print("amanda: No SparseCore info")
         return False
 
     if sc_info.num_lanes % reduce_group_size != 0:
-        print(
-            f"amanda: {sc_info.num_lanes} not divisible by {reduce_group_size}"
-        )
         return False
 
     num_cores = 1 if single_sc else sc_info.num_cores
     num_subcores = sc_info.num_subcores
     row_wave_size = row_chunk_size * num_cores * num_subcores
-    print(f"amanda: Row wave size: {row_wave_size}, num_cores: {num_cores},"
-          f" num_subcores: {num_subcores}, row_chunk_size: {row_chunk_size}")
-
     if idx.size % row_wave_size != 0:
-        print(f"amanda: {idx.size} not divisible by {row_wave_size}")
         return False
 
     return True
@@ -109,16 +99,7 @@ def _sc_gather_reduce(
   Returns:
     The reduced result as a bf16 matrix [M / reduce_group_size, K].
   """
-    print(
-        f"amanda in _sc_gather_reduce:\n"
-        f"  - op.shape: {op.shape}\n"
-        f"  - idx.shape: {idx.shape}\n"
-        f"  - topk_weights.shape: {topk_weights.shape if topk_weights is not None else None}\n"
-        f"  - reduce_group_size: {reduce_group_size}\n"
-        f"  - single_sc: {single_sc}\n"
-        f"  - col_chunk_size: {col_chunk_size}\n"
-        f"  - row_chunk_size: {row_chunk_size}\n"
-        f"  - topk_wgt_zero_nan: {topk_wgt_zero_nan}\n")
+
     sc_info = pltpu.get_tpu_info().sparse_core
     if sc_info is None:
         raise RuntimeError("SparseCore is not available on this TPU version.")
@@ -298,22 +279,13 @@ def dense_gather_reduce(
     topk_wgt_zero_nan: If True, treat zero weights as indicators of NaN during
       multiplication, resulting in zero output.
   """
-    print(
-        f"amanda in dense_gather_reduce:\n"
-        f"  - x.shape: {x.shape}\n"
-        f"  - indices.shape: {indices.shape}\n"
-        f"  - topk_weights.shape: {topk_weights.shape if topk_weights is not None else None}\n"
-        f"  - reduce_group_size: {reduce_group_size}\n"
-        f"  - topk_wgt_zero_nan: {topk_wgt_zero_nan}")
     if is_compatible(x, indices, reduce_group_size):
-        print("amanda is_compatible: True -> attempting Pallas kernel")
         K = x.shape[-1]
         col_chunk_size = min(2048, K)
         while col_chunk_size > 0:
             if K % col_chunk_size == 0 and col_chunk_size % 32 == 0:
                 break
             col_chunk_size -= 32
-        print(f"amanda col_chunk_size determined: {col_chunk_size}")
         if col_chunk_size > 0:
             # Pallas kernel expects 1D weights
             return _sc_gather_reduce(
@@ -324,7 +296,6 @@ def dense_gather_reduce(
                 col_chunk_size=col_chunk_size,
                 topk_wgt_zero_nan=topk_wgt_zero_nan,
             )
-    print("amanda falling back to JAX baseline")
     # Fallback to JAX baseline
     return _jax_fallback(x, indices, topk_weights, reduce_group_size,
                          topk_wgt_zero_nan)

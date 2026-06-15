@@ -5,9 +5,11 @@ pytest-mock
 absl-py
 numpy
 google-cloud-storage
-jax==0.10.1
-jaxlib==0.10.1
-libtpu==0.0.41
+--extra-index-url https://us-python.pkg.dev/ml-oss-artifacts-published/jax-public-nightly-artifacts-registry/simple/
+jax==0.10.2.dev20260615
+jaxlib==0.10.2.dev20260615
+--find-links https://storage.googleapis.com/jax-releases/libtpu_releases.html
+libtpu==0.0.42
 jaxtyping
 flax==0.12.4
 torchax==0.0.11
