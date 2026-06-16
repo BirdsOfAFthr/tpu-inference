@@ -75,7 +75,7 @@ def setup_environment():
 
 def initialize_layer_weights(layer: torch.nn.Module):
     torch.manual_seed(42)
-    assert isinstance(layer, RoutedExperts)
+    assert isinstance(layer, (RoutedExperts, FusedMoE))
 
     e = layer.global_num_experts
     h = layer.hidden_size
@@ -115,12 +115,12 @@ def initialize_layer_weights(layer: torch.nn.Module):
 @pytest.mark.parametrize(
     "mesh", [test_utils.get_spmd_mesh(1),
              test_utils.get_spmd_mesh(2)])
-@pytest.mark.parametrize("num_tokens", [8])
-@pytest.mark.parametrize("intermediate_size", [1024])
-@pytest.mark.parametrize("hidden_size", [128])
-@pytest.mark.parametrize("num_experts", [8])
-@pytest.mark.parametrize("topk", [2])
-@pytest.mark.parametrize("use_ep", [True, False])
+@pytest.mark.parametrize("num_tokens", [4096])
+@pytest.mark.parametrize("intermediate_size", [4096])
+@pytest.mark.parametrize("hidden_size", [7168])
+@pytest.mark.parametrize("num_experts", [128])
+@pytest.mark.parametrize("topk", [4])
+@pytest.mark.parametrize("use_ep", [False])
 def test_fused_moe_method(mesh, num_tokens, intermediate_size, hidden_size,
                           num_experts, topk, use_ep):
     engine_args = EngineArgs(
@@ -144,39 +144,40 @@ def test_fused_moe_method(mesh, num_tokens, intermediate_size, hidden_size,
         layer.moe_config.moe_parallel_config.use_ep = use_ep
     weight_quant = quant_config.target_scheme_map['Linear']['weights']
     input_quant = quant_config.target_scheme_map['Linear']['input_activations']
-    moe = quant_config.get_moe_config(layer.routed_experts)
+    moe = quant_config.get_moe_config(layer)
     method = VllmCompressedTensorsW8A8Fp8MoEMethod(weight_quant, input_quant,
                                                    moe, mesh)
-    method.create_weights(layer.routed_experts,
+    method.create_weights(layer,
                           num_experts,
                           hidden_size,
                           intermediate_size,
                           params_dtype=torch.float8_e4m3fn)
 
-    initialize_layer_weights(layer.routed_experts)
-    method.process_weights_after_loading(layer.routed_experts)
+    initialize_layer_weights(layer)
 
+    # Pre-compute reference unquantized weights and expected output before sharding/processing
     def unquantize_weight_for_ref(weight, scale):
-        return (weight.to(torch.float32) * scale.squeeze(1)).transpose(
-            1, 2).cpu()
+        return (weight.to(torch.float32) * scale).cpu()
+
+    ref_w13 = unquantize_weight_for_ref(layer.w13_weight,
+                                        layer.w13_weight_scale)
+    ref_w2 = unquantize_weight_for_ref(layer.w2_weight, layer.w2_weight_scale)
+
+    method.process_weights_after_loading(layer)
 
     seqlen = num_tokens
     with torchax.default_env():
         x = torch.ones((seqlen, hidden_size), dtype=torch.bfloat16).to('jax')
         router_logits = torch.randn((seqlen, num_experts),
                                     dtype=torch.bfloat16).to('jax')
-        result = method.apply_monolithic(layer.routed_experts, x,
-                                         router_logits)
-        expected = test_utils.ref_moe(
-            x.to(torch.float32).cpu(),
-            router_logits.to(torch.float32).cpu(),
-            unquantize_weight_for_ref(layer.routed_experts.w13_weight,
-                                      layer.routed_experts.w13_weight_scale),
-            unquantize_weight_for_ref(layer.routed_experts.w2_weight,
-                                      layer.routed_experts.w2_weight_scale),
-            w1_bias=None,
-            w2_bias=None,
-            top_k=topk,
-            renormalize=True,
-            activation="silu")
+        result = method.apply_monolithic(layer, x, router_logits)
+        expected = test_utils.ref_moe(x.to(torch.float32).cpu(),
+                                      router_logits.to(torch.float32).cpu(),
+                                      ref_w13,
+                                      ref_w2,
+                                      w1_bias=None,
+                                      w2_bias=None,
+                                      top_k=topk,
+                                      renormalize=True,
+                                      activation="silu")
         assert np.allclose(result, expected, atol=0.05, rtol=0.05)
