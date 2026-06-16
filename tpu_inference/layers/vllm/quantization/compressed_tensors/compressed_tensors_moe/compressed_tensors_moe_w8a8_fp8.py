@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import inspect
 from typing import Union
 
 import torch
@@ -32,6 +33,9 @@ from tpu_inference.layers.vllm.interface.moe import (
 from tpu_inference.layers.vllm.quantization.configs import VllmQuantConfig
 from tpu_inference.logger import init_logger
 from tpu_inference.utils import t2j
+
+_moe_classes = (RoutedExperts,
+                FusedMoE) if inspect.isclass(FusedMoE) else (RoutedExperts, )
 
 logger = init_logger(__name__)
 
@@ -76,7 +80,7 @@ class VllmCompressedTensorsW8A8Fp8MoEMethod(CompressedTensorsW8A8Fp8MoEMethod,
             c. w13_weight_scale - FP32 shape: (num_experts, 2 x intermediate_size, 1)
             d. w2_weight_scale - FP32shape: (num_experts, output_size, 1)
         """
-        assert isinstance(layer, (RoutedExperts, FusedMoE))
+        assert isinstance(layer, _moe_classes)
 
         # N.B
         # layer.w13_weight: [num_experts, 2*moe_intermediate_size, hidden_size]

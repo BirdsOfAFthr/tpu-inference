@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import inspect
+
 import torch
 from vllm.model_executor.layers.fused_moe import FusedMoE, RoutedExperts
 from vllm.model_executor.layers.quantization.compressed_tensors.compressed_tensors_moe.compressed_tensors_moe import \
@@ -22,6 +24,9 @@ from tpu_inference.layers.vllm.quantization.compressed_tensors.compressed_tensor
 from tpu_inference.layers.vllm.quantization.unquantized import \
     VllmUnquantizedFusedMoEMethod
 from tpu_inference.logger import init_logger
+
+_moe_classes = (RoutedExperts,
+                FusedMoE) if inspect.isclass(FusedMoE) else (RoutedExperts, )
 
 logger = init_logger(__name__)
 
@@ -34,7 +39,7 @@ class VllmCompressedTensorsMoEMethod(CompressedTensorsMoEMethod):
         layer: torch.nn.Module,
         layer_name: str,
     ) -> CompressedTensorsMoEMethod:
-        assert isinstance(layer, (RoutedExperts, FusedMoE))
+        assert isinstance(layer, _moe_classes)
 
         # FusedMoE was made by combining multiple Linears so need to
         # make sure quantization config for Linear can target it

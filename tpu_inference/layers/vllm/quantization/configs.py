@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import inspect
 from typing import Union
 
 import torchax
@@ -37,6 +38,9 @@ from tpu_inference.utils import TPU_SECOND_LAST_MINOR, get_mesh_shape_product
 # yapf: enable
 
 P = PartitionSpec
+
+_moe_classes = (RoutedExperts,
+                FusedMoE) if inspect.isclass(FusedMoE) else (RoutedExperts, )
 
 logger = init_logger(__name__)
 
@@ -126,7 +130,7 @@ class VllmQuantConfig:
 
     def get_moe_config(
             self, layer: Union[RoutedExperts, FusedMoE]) -> FusedMoEConfig:
-        assert isinstance(layer, (RoutedExperts, FusedMoE))
+        assert isinstance(layer, _moe_classes)
         moe_config = layer.moe_config
         use_ep = self.vllm_config.parallel_config.enable_expert_parallel
         moe_config.moe_parallel_config.use_ep = use_ep

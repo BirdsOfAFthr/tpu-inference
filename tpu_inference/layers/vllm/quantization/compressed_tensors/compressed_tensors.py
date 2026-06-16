@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import inspect
 from typing import Optional
 
 import torch
@@ -42,6 +43,9 @@ from tpu_inference.layers.vllm.quantization.configs import VllmQuantConfig
 from tpu_inference.layers.vllm.quantization.unquantized import \
     VllmUnquantizedConfig
 from tpu_inference.logger import init_logger
+
+_moe_classes = (RoutedExperts,
+                FusedMoE) if inspect.isclass(FusedMoE) else (RoutedExperts, )
 
 P = PartitionSpec
 logger = init_logger(__name__)
@@ -139,7 +143,7 @@ class VllmCompressedTensorsConfig(CompressedTensorsConfig, VllmQuantConfig):
                         self, layer, prefix)
                 layer.scheme = scheme
                 return CompressedTensorsLinearMethod(self)
-            case RoutedExperts() | FusedMoE():
+            case _ if isinstance(layer, _moe_classes):
                 layer.moe_config = self.get_moe_config(layer)
                 return VllmCompressedTensorsMoEMethod.get_moe_method(
                     self, layer, layer_name=prefix)
