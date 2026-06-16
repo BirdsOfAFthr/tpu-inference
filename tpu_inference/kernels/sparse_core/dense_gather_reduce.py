@@ -36,25 +36,7 @@ def is_compatible(
     single_sc: bool = False,
 ) -> bool:
     """Checks if the inputs are compatible with the SparseCore Pallas kernel."""
-    if op.dtype != jnp.bfloat16 and op.dtype != jnp.float32:
-        return False
-    if op.shape[0] % reduce_group_size != 0:
-        return False
-
-    sc_info = pltpu.get_tpu_info().sparse_core
-    if sc_info is None:
-        return False
-
-    if sc_info.num_lanes % reduce_group_size != 0:
-        return False
-
-    num_cores = 1 if single_sc else sc_info.num_cores
-    num_subcores = sc_info.num_subcores
-    row_wave_size = row_chunk_size * num_cores * num_subcores
-    if idx.size % row_wave_size != 0:
-        return False
-
-    return True
+    return False
 
 
 def _sc_gather_reduce(
