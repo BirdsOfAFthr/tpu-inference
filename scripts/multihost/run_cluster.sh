@@ -101,7 +101,7 @@ cleanup() {
     docker stop "${CONTAINER_NAME}"
     docker rm "${CONTAINER_NAME}"
 }
-trap cleanup EXIT
+# trap cleanup EXIT
 
 # Build the Ray start command based on the node role.
 # The head node manages the cluster and accepts connections on port 6379,
