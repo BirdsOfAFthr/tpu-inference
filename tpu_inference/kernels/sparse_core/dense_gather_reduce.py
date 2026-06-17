@@ -279,23 +279,5 @@ def dense_gather_reduce(
     topk_wgt_zero_nan: If True, treat zero weights as indicators of NaN during
       multiplication, resulting in zero output.
   """
-    if is_compatible(x, indices, reduce_group_size):
-        K = x.shape[-1]
-        col_chunk_size = min(2048, K)
-        while col_chunk_size > 0:
-            if K % col_chunk_size == 0 and col_chunk_size % 32 == 0:
-                break
-            col_chunk_size -= 32
-        if col_chunk_size > 0:
-            # Pallas kernel expects 1D weights
-            return _sc_gather_reduce(
-                x,
-                indices,
-                topk_weights.reshape(-1),
-                reduce_group_size=reduce_group_size,
-                col_chunk_size=col_chunk_size,
-                topk_wgt_zero_nan=topk_wgt_zero_nan,
-            )
-    # Fallback to JAX baseline
     return _jax_fallback(x, indices, topk_weights, reduce_group_size,
                          topk_wgt_zero_nan)
