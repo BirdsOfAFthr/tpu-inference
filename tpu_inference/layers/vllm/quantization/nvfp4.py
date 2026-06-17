@@ -125,14 +125,15 @@ class VllmNvfp4LinearMethod(VllmUnquantizedLinearMethod):
         # Monkeypatch expose_input_quant_key in modelopt module safely on TPU
         from vllm.model_executor.layers.quantization import \
             modelopt as vllm_modelopt
-        original_expose = vllm_modelopt.expose_input_quant_key
+        if hasattr(vllm_modelopt, 'expose_input_quant_key'):
+            original_expose = vllm_modelopt.expose_input_quant_key
 
-        def safe_expose_input_quant_key(layer, kernel):
-            if kernel is None:
-                return
-            original_expose(layer, kernel)
+            def safe_expose_input_quant_key(layer, kernel):
+                if kernel is None:
+                    return
+                original_expose(layer, kernel)
 
-        vllm_modelopt.expose_input_quant_key = safe_expose_input_quant_key
+            vllm_modelopt.expose_input_quant_key = safe_expose_input_quant_key
 
         VllmUnquantizedLinearMethod.__init__(self, linear_config)
         self.quant_config = quant_config
