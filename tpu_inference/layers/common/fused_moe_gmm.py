@@ -351,10 +351,10 @@ def moe_gmm_local(x: jax.Array,
                                                     cur_weights.reshape(-1),
                                                     cur_mask.reshape(-1), topk)
         else:
-            out = dense_gather_reduce(
+            chunk_hidden = dense_gather_reduce(
                 gmm2_res,
-                topk_argsort_revert_indices,
-                topk_weights * mask.reshape(topk_weights.shape),
+                cur_indices,
+                cur_weights * cur_mask.reshape(cur_weights.shape),
                 topk,
             )
 
@@ -399,7 +399,8 @@ def moe_gmm_local(x: jax.Array,
                 out = chunk_hidden.astype(x.dtype)
         else:
             if parallelism == "hybrid":
-                out = jax.lax.psum(chunk_hidden, axis_name=hybrid_ep_axis +
+                out = jax.lax.psum(chunk_hidden,
+                                   axis_name=hybrid_ep_axis +
                                    hybrid_tp_axis).astype(x.dtype)
             else:
                 out = jax.lax.psum(chunk_hidden,
