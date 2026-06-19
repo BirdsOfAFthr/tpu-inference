@@ -292,6 +292,14 @@ class ShardingConfigManager:
         # --additional_config='{"mm-encoder-tp-mode": "data"}'
         mm_encoder_tp_mode = vllm_config.additional_config.get(
             'mm-encoder-tp-mode', 'weights')
+        logger.info(f"amanda: ShardingStrategy - "
+                    f"tensor_parallelism={tensor_parallelism}, "
+                    f"data_parallelism={data_parallelism}, "
+                    f"expert_parallelism={expert_parallelism}, "
+                    f"sequence_parallelism={sequence_parallelism}, "
+                    f"attention_data_parallelism={attn_dp}, "
+                    f"attention_data_expert_parallelism={attn_dp_expert}, "
+                    f"decode_context_parallelism={decode_context_parallelism}")
         cls.validate(vllm_config, sharding_strategy)
         return cls(sharding_strategy, device_indexes, mm_encoder_tp_mode)
 
