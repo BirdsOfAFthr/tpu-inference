@@ -354,7 +354,7 @@ def moe_gmm_local(x: jax.Array,
             chunk_hidden = dense_gather_reduce(
                 gmm2_res,
                 topk_argsort_revert_indices,
-                topk_weights,
+                topk_weights * mask.reshape(topk_weights.shape),
                 topk,
             )
 
