@@ -351,16 +351,12 @@ def moe_gmm_local(x: jax.Array,
                                                     cur_weights.reshape(-1),
                                                     cur_mask.reshape(-1), topk)
         else:
-            out = ragged_gather_reduce(gmm2_res, topk_argsort_revert_indices,
-                                       topk_weights.reshape(-1),
-                                       mask.reshape(-1), topk)
-    else:
-        out = dense_gather_reduce(
-            gmm2_res,
-            topk_argsort_revert_indices,
-            topk_weights,
-            topk,
-        )
+            out = dense_gather_reduce(
+                gmm2_res,
+                topk_argsort_revert_indices,
+                topk_weights * mask.reshape(topk_weights.shape),
+                topk,
+            )
 
         if enable_rs_kernel:
             # Fallback to psum-scatter for small token sizes to avoid Mosaic compilation.
