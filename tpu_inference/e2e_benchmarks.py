@@ -50,7 +50,7 @@ PROFILES = [
     },
 ]
 # Reversed order to compile the largest batch size first
-CONCURRENCIES = [1, 2, 4, 8, 16, 32, 64, 128]
+CONCURRENCIES = [None]
 
 # Generate a single unique timestamp directory for this entire run session
 RUN_TIMESTAMP = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -190,8 +190,12 @@ def get_existing_result(isl, osl, concurrency):
 
 def run_benchmark(isl, osl, concurrency, dataset_path):
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"bench_isl{isl}_osl{osl}_c{concurrency}_{timestamp}.json"
-    num_prompts = concurrency * 10
+    concurrency_str = "None" if concurrency is None else str(concurrency)
+    filename = f"bench_isl{isl}_osl{osl}_c{concurrency_str}_{timestamp}.json"
+    if concurrency is not None:
+        num_prompts = concurrency * 10
+    else:
+        num_prompts = 1280
 
     cmd = [
         "vllm",
@@ -215,8 +219,6 @@ def run_benchmark(isl, osl, concurrency, dataset_path):
         "-1",
         "--num-prompts",
         str(num_prompts),
-        "--max-concurrency",
-        str(concurrency),
         "--request-rate",
         "inf",
         "--ignore-eos",
@@ -231,6 +233,8 @@ def run_benchmark(isl, osl, concurrency, dataset_path):
         filename,
         "--trust-remote-code",
     ]
+    if concurrency is not None:
+        cmd.extend(["--max-concurrency", str(concurrency)])
 
     print(f"\n>>> Running: ISL: {isl} | OSL: {osl} | Concurrency:"
           f" {concurrency}")
@@ -369,8 +373,8 @@ def main():
         for profile in PROFILES:
             isl, osl = profile["isl"], profile["osl"]
 
-            # Max prompts needed is max_concurrency * 10
-            max_prompts_needed = max(CONCURRENCIES) * 10
+            max_c = max(c for c in CONCURRENCIES if c is not None) if any(c is not None for c in CONCURRENCIES) else 128
+            max_prompts_needed = max_c * 10
 
             # Generate shared dataset
             dataset_path = generate_fixed_len_dataset(isl, osl,
