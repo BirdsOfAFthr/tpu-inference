@@ -845,9 +845,8 @@ class PhasedBasedProfiler:
                     phase: The phase of the inference the batch is in.
         """
 
-        # We want to start profiling only after the first trial request
         is_past_initial_request = batch_composition_stats[
-            "total_num_scheduled_tokens"] > 1
+            "total_num_scheduled_tokens"] >= 1
         if is_past_initial_request:
             # We haven't started profiling yet
             if self.profiling_n_steps_left <= 0:
