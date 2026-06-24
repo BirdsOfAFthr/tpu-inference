@@ -181,8 +181,8 @@ class AsyncTPUModelRunnerOutput(AsyncModelRunnerOutput):
             self._model_runner_output.prompt_logprobs_dict = (
                 self._runner._get_prompt_logprobs_dict(
                     self._prompt_logprobs_async_data))
-
-        if self._runner.model_config.enable_return_routed_experts and self._expert_indices is not None:
+        if getattr(self._runner.model_config, "enable_return_routed_experts",
+                   False) and self._expert_indices is not None:
             expert_indices_cpu = np.asarray(
                 jax.device_get(self._expert_indices))
 
@@ -1251,6 +1251,12 @@ class TPUModelRunner(KVConnectorModelRunnerMixin, LoRAModelRunnerMixin):
                      self.is_first_rank,
                      self.is_last_rank,
                  )
+            if getattr(self.model_config, "enable_return_routed_experts",
+                       False) and expert_indices is not None:
+                from jax.experimental.multihost_utils import process_allgather
+                with jax.set_mesh(self.mesh):
+                    expert_indices = process_allgather(expert_indices,
+                                                       tiled=True)
             if not self.is_last_rank:
                 assert isinstance(hidden_states, JaxIntermediateTensors)
                 hidden_states.kv_connector_output = kv_connector_output
@@ -1420,6 +1426,12 @@ class TPUModelRunner(KVConnectorModelRunnerMixin, LoRAModelRunnerMixin):
         self.rng_params_for_sampling = final_rng
 
         self.kv_caches = final_kv_caches
+
+        if all_expert_indices is not None:
+            from jax.experimental.multihost_utils import process_allgather
+            with jax.set_mesh(self.mesh):
+                all_expert_indices = process_allgather(all_expert_indices,
+                                                       tiled=True)
 
         # continue_decode now returns fixed-size stacked buffers plus the
         # number of steps actually executed (early EOS exit can stop before

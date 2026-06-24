@@ -45,6 +45,25 @@ from vllm.v1.pool.metadata import PoolingMetadata
 from vllm.v1.worker.gpu.spec_decode.eagle.eagle3_utils import \
     set_eagle3_aux_hidden_state_layers
 
+# Monkey patch MistralLarge3ForCausalLM to set first_k_dense_replace to 3
+try:
+    from vllm.model_executor.models.mistral_large_3 import \
+        MistralLarge3ForCausalLM
+    original_init = MistralLarge3ForCausalLM.__init__
+
+    def patched_init(self, *, vllm_config, prefix=""):
+        import logging
+        logger = logging.getLogger("vllm")
+        config = getattr(vllm_config.model_config, "hf_config", None)
+        if config is not None:
+            config.first_k_dense_replace = 3
+            logger.info("patched_init: set config.first_k_dense_replace = 3")
+        original_init(self, vllm_config=vllm_config, prefix=prefix)
+
+    MistralLarge3ForCausalLM.__init__ = patched_init
+except ImportError:
+    pass
+
 from tpu_inference import envs
 from tpu_inference.distributed.jax_parallel_state import \
     get_pp_group as jax_get_pp_group
@@ -214,6 +233,13 @@ class VllmModelWrapper:
         self.mesh = mesh
         self.is_draft_model = is_draft_model
         self._mm_encoder_jit_manager: MMEncoderJITManager | None = None
+
+        hf_config = getattr(self.vllm_config.model_config, "hf_config", None)
+        if hf_config is not None:
+            if getattr(hf_config, "model_type", None) in (
+                    "mistral", "deepseek_v2") or "Mistral-Large" in getattr(
+                        self.vllm_config.model_config, "model", ""):
+                hf_config.first_k_dense_replace = 3
 
         self.vllm_config.quant_config = get_tpu_quantization_config(
             self.vllm_config, self.mesh)
@@ -465,6 +491,14 @@ class VllmModelWrapper:
             if expert_indices_list:
                 import jax.numpy as jnp
                 expert_indices = jnp.stack(expert_indices_list, axis=0)
+                first_k_dense = getattr(
+                    self.vllm_config.model_config.hf_config,
+                    "first_k_dense_replace", 0)
+                if first_k_dense > 0:
+                    pad_shape = (first_k_dense, ) + expert_indices.shape[1:]
+                    padding = jnp.zeros(pad_shape, dtype=expert_indices.dtype)
+                    expert_indices = jnp.concatenate([padding, expert_indices],
+                                                     axis=0)
             else:
                 expert_indices = None
             return new_kv_caches, output, aux_hidden_states, expert_indices
