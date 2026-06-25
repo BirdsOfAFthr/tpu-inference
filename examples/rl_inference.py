@@ -47,7 +47,7 @@ def main():
         download_dir="/mnt/disks/persist/hf/hub",
         max_model_len=32000,
         max_num_batched_tokens=2048,
-        max_num_seqs=16,  # Adjusted from 16 to 128 to allow concurrency 128
+        max_num_seqs=128,  # Adjusted to 128 to allow concurrency 128
         enable_prefix_caching=False,
         tensor_parallel_size=8,
         kv_cache_dtype="fp8",
