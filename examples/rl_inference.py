@@ -43,11 +43,11 @@ def main():
 
     # Initialize LLM with the exact parameters from the vllm serve command
     llm = LLM(
-        model="mistralai/Mistral-Small-4-119B-2603",
+        model="mistralai/Mistral-Large-3-675B-Instruct-2512",
         download_dir="/mnt/disks/persist/hf/hub",
-        max_model_len=32000,
+        max_model_len=3072,
         max_num_batched_tokens=2048,
-        max_num_seqs=128,  # Adjusted to 128 to allow concurrency 128
+        max_num_seqs=8,  # Adjusted to 128 to allow concurrency 128
         enable_prefix_caching=False,
         tensor_parallel_size=8,
         kv_cache_dtype="fp8",
