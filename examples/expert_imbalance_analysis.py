@@ -161,8 +161,9 @@ def main(args: dict):
         for output in outputs:
             prompt_len = len(output.prompt_token_ids)
             generated_text = output.outputs[0].text
+            generated_token_ids = output.outputs[0].token_ids
             print(
-                f"Prompt Length: {prompt_len} tokens | Generated text: {generated_text!r}"
+                f"Prompt Length: {prompt_len} tokens | Generated text: {generated_text!r} | Token IDs (first 20): {generated_token_ids[:20]}"
             )
 
             for completion in output.outputs:
