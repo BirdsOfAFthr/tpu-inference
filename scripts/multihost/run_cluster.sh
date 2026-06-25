@@ -146,6 +146,7 @@ docker run \
     --ipc=host \
     --name "${CONTAINER_NAME}" \
     -v "${PATH_TO_HF_HOME}:/root/.cache/huggingface" \
+    -v /tmp/ray:/tmp/ray \
     "${GCLOUD_MOUNT_ARGS[@]}" \
     "${CHECKPOINT_MOUNT_ARGS[@]}" \
     "${ADDITIONAL_ARGS[@]}" \
