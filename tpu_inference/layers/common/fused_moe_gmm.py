@@ -342,9 +342,12 @@ def moe_gmm_local(x: jax.Array,
             cur_sorted = token_hidden_full.reshape(
                 (-1, topk, gmm2_res.shape[-1]))
             cur_topk_weights = jnp.expand_dims(cur_weights, axis=-1)
-            cur_weighted = cur_sorted * cur_topk_weights
-            cur_masked = jnp.where(cur_mask, cur_weighted, 0.0)
-            chunk_hidden = cur_masked.sum(axis=-2)
+            # Avoid NaN * 0.0 = NaN by using jnp.where before multiplication
+            cur_weighted = jnp.where((cur_topk_weights == 0.0) | (~cur_mask),
+                                     0.0,
+                                     cur_sorted.astype(jnp.float32) *
+                                     cur_topk_weights.astype(jnp.float32))
+            chunk_hidden = cur_weighted.sum(axis=-2).astype(gmm2_res.dtype)
 
         if enable_rs_kernel:
             # Fallback to psum-scatter for small token sizes to avoid Mosaic compilation.
