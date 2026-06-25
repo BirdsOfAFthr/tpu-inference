@@ -110,6 +110,11 @@ def quantize_moe_weights(
     # Cap the block size for w2 at its contracting dimension size
     w2_block_size = min(w2_block_size, orig_intermediate_size)
 
+    # Cap the block size for w2 at its contracting dimension size
+    w2_block_size = min(w2_block_size, orig_intermediate_size)
+    logger.info(
+        f"amanda quantize_moe_weights: [MoE quantizaiton]: w13_block_size: {w13_block_size}, w2_block_size: {w2_block_size}"
+    )
     hidden_size = align_to(orig_hidden_size, w13_block_size)
     intermediate_size = align_to(orig_intermediate_size, w2_block_size)
 
@@ -144,8 +149,14 @@ def quantize_moe_weights(
 
     w13_weight, w13_weight_scale = quantize_tensor(dtype, w13_weight, 2,
                                                    w13_block_size)
+    logger.info(
+        f"amanda quantize_tensor quantize_moe_weights w13_fp32: {w13_weight.shape}, w13_block_size: {w13_block_size}, w13_q_b: {w13_weight.shape}, w13_s_new_b: {w13_weight_scale.shape}"
+    )
     w2_weight, w2_weight_scale = quantize_tensor(dtype, w2_weight, 2,
                                                  w2_block_size)
+    logger.info(
+        f"amanda quantize_tensor quantize_moe_weights w2_fp32: {w2_weight.shape}, w2_block_size: {w2_block_size}, w2_q_b: {w2_weight.shape}, w2_s_new_b: {w2_weight_scale.shape}"
+    )
 
     weights.w13_weight = w13_weight
     weights.w13_weight_scale = w13_weight_scale
@@ -579,7 +590,8 @@ def _get_moe_weight_shardings(
                     and weights.w2_weight_scale.shape[1] == 1):
                 w2_weight_scale_p_spec = P()
             else:
-                w2_weight_scale_p_spec = P(None, ShardingAxisName.MLP_TENSOR)
+                w2_weight_scale_p_spec = P(None, ShardingAxisName.MLP_TENSOR,
+                                           None, None)
             return FusedMoEWeights(
                 w13_weight=NamedSharding(
                     mesh,
@@ -807,7 +819,6 @@ def _process_moe_weights_no_requant(
         w2_weight_scale=w2_weight_scale,
         w2_bias=weights.w2_bias,
     )
-
     out = process_moe_weights(
         weights,
         moe_backend=moe_backend,
@@ -913,18 +924,29 @@ def _requant_expert_batch_fn(
     w2_pad_widths = ((0, 0), (0, hidden_pad), (0, inter_pad))
     w2_fp32 = jnp.pad(w2_fp32, w2_pad_widths)
 
-    clip_pct = envs.MOE_REQUANTIZE_CLIP_PERCENTILE
+    if envs.MOE_REQUANTIZE_CLIP_PERCENTILE is not None:
+        percentile_val = envs.MOE_REQUANTIZE_CLIP_PERCENTILE
 
-    w13_q_b, w13_s_new_b = quantize_tensor(desired_quant_dtype,
-                                           w13_fp32,
-                                           2,
-                                           w13_block_size,
-                                           clip_percentile=clip_pct)
-    w2_q_b, w2_s_new_b = quantize_tensor(desired_quant_dtype,
-                                         w2_fp32,
-                                         2,
-                                         w2_block_size,
-                                         clip_percentile=clip_pct)
+        for arr_name in ('w13', 'w2'):
+            arr = w13_fp32 if arr_name == 'w13' else w2_fp32
+
+            clip_val = jnp.percentile(jnp.abs(arr), percentile_val)
+
+            if arr_name == 'w13':
+                w13_fp32 = jnp.clip(w13_fp32, -clip_val, clip_val)
+            else:
+                w2_fp32 = jnp.clip(w2_fp32, -clip_val, clip_val)
+
+    w13_q_b, w13_s_new_b = quantize_tensor(desired_quant_dtype, w13_fp32, 2,
+                                           w13_block_size)
+    logger.info(
+        f"amanda quantize_tensor w13_fp32: {w13_fp32.shape}, w13_block_size: {w13_block_size}, w13_q_b: {w13_q_b.shape}, w13_s_new_b: {w13_s_new_b.shape}"
+    )
+    w2_q_b, w2_s_new_b = quantize_tensor(desired_quant_dtype, w2_fp32, 2,
+                                         w2_block_size)
+    logger.info(
+        f"amanda quantize_tensor w2_fp32: {w2_fp32.shape}, w2_block_size: {w2_block_size}, w2_q_b: {w2_q_b.shape}, w2_s_new_b: {w2_s_new_b.shape}"
+    )
     return carry, (w13_q_b, w13_s_new_b, w2_q_b, w2_s_new_b)
 
 
@@ -1077,6 +1099,19 @@ def _process_quantized_moe_weights_impl(
                       or activation == MoEActivation.SWIGLUOAI)
     w13_reorder_size = get_mesh_shape_product(mesh,
                                               ShardingAxisName.MLP_TENSOR)
+    logger.info("amanda >>> [MOE REQUANT LOG] BEFORE requant process")
+    logger.info(
+        f"amanda >>> [MOE REQUANT LOG] w13_weight shape = {weights.w13_weight.shape}"
+    )
+    logger.info(
+        f"amanda >>> [MOE REQUANT LOG] w2_weight shape = {weights.w2_weight.shape}"
+    )
+    logger.info(
+        f"amanda >>> [MOE REQUANT LOG] w13_weight_scale shape = {weights.w13_weight_scale.shape if weights.w13_weight_scale is not None else None}"
+    )
+    logger.info(
+        f"amanda >>> [MOE REQUANT LOG] w2_weight_scale shape = {weights.w2_weight_scale.shape if weights.w2_weight_scale is not None else None}"
+    )
 
     if disable_weight_requantization:
         return _process_moe_weights_no_requant(
@@ -1110,13 +1145,18 @@ def _process_quantized_moe_weights_impl(
         w13_block_size, w2_block_size = requant_block_size
     else:
         w13_block_size = w2_block_size = requant_block_size
+    # Cap the block size for w2 at its contracting dimension size
+    w2_block_size = min(w2_block_size, orig_intermediate_size)
 
-    if requant_block_size is not None and moe_backend == MoEBackend.GMM_TP:
-        tp_size = get_mesh_shape_product(mesh, ShardingAxisName.MLP_TENSOR)
-        max_w2_block_size = orig_intermediate_size // tp_size
+    tp_size = get_mesh_shape_product(mesh, ShardingAxisName.MLP_TENSOR)
+    max_w2_block_size = orig_intermediate_size // tp_size
 
-        # Cap the block size to avoid sharding indivisible errors
-        w2_block_size = min(w2_block_size, max_w2_block_size)
+    # Cap the block size to avoid sharding indivisible errors
+    w2_block_size = min(w2_block_size, max_w2_block_size)
+
+    logger.info(
+        f"amanda w13_block_size: {w13_block_size}, w2_block_size: {w2_block_size}"
+    )
     hidden_size = align_to(orig_hidden_size, w13_block_size)
     intermediate_size = align_to(orig_intermediate_size, w2_block_size)
 
@@ -1190,6 +1230,20 @@ def _process_quantized_moe_weights_impl(
         w2_bias=w2_b,
     )
 
+    logger.info("amanda >>> [MOE REQUANT LOG] AFTER requant process")
+    logger.info(
+        f"amanda >>> [MOE REQUANT LOG] w13_weight shape = {out.w13_weight.shape}"
+    )
+    logger.info(
+        f"amanda >>> [MOE REQUANT LOG] w2_weight shape = {out.w2_weight.shape}"
+    )
+    logger.info(
+        f"amanda >>> [MOE REQUANT LOG] w13_weight_scale shape = {out.w13_weight_scale.shape if out.w13_weight_scale is not None else None}"
+    )
+    logger.info(
+        f"amanda >>> [MOE REQUANT LOG] w2_weight_scale shape = {out.w2_weight_scale.shape if out.w2_weight_scale is not None else None}"
+    )
+
     target_shardings = _get_moe_weight_shardings(out, moe_backend, mesh)
     for field in fields(FusedMoEWeights):
         key = field.name
@@ -1197,6 +1251,21 @@ def _process_quantized_moe_weights_impl(
             sharding = getattr(target_shardings, key)
             setattr(out, key,
                     jax.lax.with_sharding_constraint(weight, sharding))
+
+    logger.info("amanda >>> [MOE REQUANT LOG] AFTER requant reshard")
+    logger.info(
+        f"amanda >>> [MOE REQUANT LOG] w13_weight shape = {out.w13_weight.shape}"
+    )
+    logger.info(
+        f"amanda >>> [MOE REQUANT LOG] w2_weight shape = {out.w2_weight.shape}"
+    )
+    logger.info(
+        f"amanda >>> [MOE REQUANT LOG] w13_weight_scale shape = {out.w13_weight_scale.shape if out.w13_weight_scale is not None else None}"
+    )
+    logger.info(
+        f"amanda >>> [MOE REQUANT LOG] w2_weight_scale shape = {out.w2_weight_scale.shape if out.w2_weight_scale is not None else None}"
+    )
+
     return out
 
 
