@@ -1855,7 +1855,16 @@ class TPUModelRunner(KVConnectorModelRunnerMixin, LoRAModelRunnerMixin):
             model_runner_output.routed_experts = routed_experts
 
             # --- EXPERT IMBALANCE PATCH ---
-            if scheduler_output.num_prefill_tokens > 0:
+            has_prefill = False
+            for req_id in self.input_batch.req_ids[:self.input_batch.num_reqs]:
+                if req_id in self.input_batch.req_id_to_index:
+                    req_idx = self.input_batch.req_id_to_index[req_id]
+                    if self.input_batch.num_computed_tokens_cpu[
+                            req_idx] < self.input_batch.num_prompt_tokens[
+                                req_idx]:
+                        has_prefill = True
+                        break
+            if has_prefill:
                 import collections
                 expert_counts = collections.Counter(
                     expert_indices_cpu.flatten().tolist())
