@@ -1854,6 +1854,17 @@ class TPUModelRunner(KVConnectorModelRunnerMixin, LoRAModelRunnerMixin):
             )
             model_runner_output.routed_experts = routed_experts
 
+            # --- EXPERT IMBALANCE PATCH ---
+            if scheduler_output.num_prefill_tokens > 0:
+                import collections
+                expert_counts = collections.Counter(
+                    expert_indices_cpu.flatten().tolist())
+                logger.info("--- Prefill Expert Imbalance (Top 10) ---")
+                for e_id, count in expert_counts.most_common(10):
+                    logger.info(f"Expert {e_id:3d}: {count} tokens")
+                logger.info("---------------------------------------")
+            # ------------------------------
+
         return model_runner_output
 
     @jax.jit(static_argnums=(0, ))

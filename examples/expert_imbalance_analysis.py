@@ -76,6 +76,16 @@ def main(args: dict):
 
     # Create an LLM
     args["enable_return_routed_experts"] = True
+    args["hf_overrides"] = {"num_hidden_layers": 5}
+    args["enforce_eager"] = True
+    args["async_scheduling"] = False
+    args["additional_config"] = {
+        "sharding": {
+            "sharding_strategy": {
+                "enable_dp_attention": True
+            }
+        }
+    }
     llm = LLM(**args)
 
     # Create a sampling params object
@@ -154,7 +164,8 @@ def main(args: dict):
             llm.stop_profile()
 
         import collections
-        expert_counts = collections.Counter()
+        prefill_expert_counts = collections.Counter()
+        decode_expert_counts = collections.Counter()
 
         # Print the outputs.
         print("-" * 50)
@@ -166,12 +177,16 @@ def main(args: dict):
                 f"Prompt Length: {prompt_len} tokens | Generated text: {generated_text!r} | Token IDs (first 20): {generated_token_ids[:20]}"
             )
 
+            if getattr(output, "prompt_routed_experts", None) is not None:
+                prefill_expert_counts.update(
+                    output.prompt_routed_experts.flatten().tolist())
+
             for completion in output.outputs:
                 if completion.routed_experts is not None:
                     print(
                         f"Routed experts shape: {completion.routed_experts.shape}"
                     )
-                    expert_counts.update(
+                    decode_expert_counts.update(
                         completion.routed_experts.flatten().tolist())
 
                 if completion.logprobs is not None:
@@ -180,30 +195,36 @@ def main(args: dict):
 
             print("-" * 50)
 
-        total_tokens_routed = sum(expert_counts.values())
-        if total_tokens_routed > 0:
-            print(
-                f"\n--- Expert Imbalance Report (Concurrency {concurrency}) ---"
-            )
-            print(f"Total routing decisions made: {total_tokens_routed}")
+        def print_report(title, expert_counts):
+            total_tokens_routed = sum(expert_counts.values())
+            if total_tokens_routed > 0:
+                print(f"\n--- {title} ---")
+                print(f"Total routing decisions made: {total_tokens_routed}")
 
-            # Print the top 10 most used experts
-            print("\nTop 10 Most Used Experts:")
-            for expert_id, count in expert_counts.most_common(10):
-                percentage = (count / total_tokens_routed) * 100
-                print(
-                    f"Expert {expert_id:3d}: {count:6d} times ({percentage:.2f}%)"
-                )
+                # Print the top 10 most used experts
+                print("Top 10 Most Used Experts:")
+                for expert_id, count in expert_counts.most_common(10):
+                    percentage = (count / total_tokens_routed) * 100
+                    print(
+                        f"Expert {expert_id:3d}: {count:6d} times ({percentage:.2f}%)"
+                    )
 
-            # Print the bottom 10 least used experts
-            print("\nBottom 10 Least Used Experts:")
-            for expert_id, count in reversed(
-                    expert_counts.most_common()[-10:]):
-                percentage = (count / total_tokens_routed) * 100
-                print(
-                    f"Expert {expert_id:3d}: {count:6d} times ({percentage:.2f}%)"
-                )
-            print("-" * 45)
+                # Print the bottom 10 least used experts
+                print("\nBottom 10 Least Used Experts:")
+                for expert_id, count in reversed(
+                        expert_counts.most_common()[-10:]):
+                    percentage = (count / total_tokens_routed) * 100
+                    print(
+                        f"Expert {expert_id:3d}: {count:6d} times ({percentage:.2f}%)"
+                    )
+                print("-" * 45)
+
+        print_report(
+            f"Prefill Expert Imbalance Report (Concurrency {concurrency})",
+            prefill_expert_counts)
+        print_report(
+            f"Decode Expert Imbalance Report (Concurrency {concurrency})",
+            decode_expert_counts)
 
 
 if __name__ == "__main__":
