@@ -37,7 +37,8 @@ def main():
                 prompts.append(data["prompt"])
     else:
         # Fallback if dataset isn't generated yet
-        prompts = ["Hello, this is a test prompt to check expert routing."] * concurrency
+        prompts = ["Hello, this is a test prompt to check expert routing."
+                   ] * concurrency
 
     print(f"Loaded {len(prompts)} prompts. Initializing LLM...")
 
@@ -93,22 +94,55 @@ def main():
             total_tokens_routed += routed_experts.shape[
                 0] * routed_experts.shape[1] * routed_experts.shape[2]
 
-    print("\n--- Expert Imbalance Report (128 concurrent requests) ---")
+    # Calculate overall imbalance metrics
+    num_experts = 128
+    all_expert_loads = [expert_counts[i] for i in range(num_experts)]
+    max_load = max(all_expert_loads)
+    mean_load = sum(all_expert_loads) / num_experts
+    max_mean_ratio = max_load / mean_load if mean_load > 0 else 1.0
+
+    print("\n--- Expert Imbalance Report ---")
     print(f"Total routing decisions made: {total_tokens_routed}")
+    print(f"Max expert load:              {max_load} tokens")
+    print(f"Mean expert load:             {mean_load:.2f} tokens")
+    print(f"Max/Mean Load Ratio:          {max_mean_ratio:.4f}")
 
     # Print the top 10 most used experts
     print("\nTop 10 Most Used Experts:")
     for expert_id, count in expert_counts.most_common(10):
         percentage = (count / total_tokens_routed
                       ) * 100 if total_tokens_routed > 0 else 0
-        print(f"Expert {expert_id:3d}: {count} times ({percentage:.2f}%)")
+        print(f"  Expert {expert_id:3d}: {count:5d} times ({percentage:.2f}%)")
 
     # Print the bottom 10 least used experts
     print("\nBottom 10 Least Used Experts:")
     for expert_id, count in reversed(expert_counts.most_common()[-10:]):
         percentage = (count / total_tokens_routed
                       ) * 100 if total_tokens_routed > 0 else 0
-        print(f"Expert {expert_id:3d}: {count} times ({percentage:.2f}%)")
+        print(f"  Expert {expert_id:3d}: {count:5d} times ({percentage:.2f}%)")
+
+    # Compute and print layer-wise Max/Mean ratios
+    if len(outputs) > 0 and hasattr(
+            outputs[0], 'prompt_routed_experts'
+    ) and outputs[0].prompt_routed_experts is not None:
+        num_layers = outputs[0].prompt_routed_experts.shape[1]
+        print("\nLayer-wise Max/Mean Expert Ratios:")
+        for layer in range(num_layers):
+            layer_counts = collections.Counter()
+            for output in outputs:
+                if hasattr(output, 'prompt_routed_experts'
+                           ) and output.prompt_routed_experts is not None:
+                    layer_counts.update(output.prompt_routed_experts[:,
+                                                                     layer, :].
+                                        flatten().tolist())
+
+            layer_loads = [layer_counts[i] for i in range(num_experts)]
+            l_max = max(layer_loads)
+            l_mean = sum(layer_loads) / num_experts
+            l_ratio = l_max / l_mean if l_mean > 0 else 1.0
+            print(
+                f"  Layer {layer:2d} | Max: {l_max:5d} | Mean: {l_mean:6.2f} | Max/Mean: {l_ratio:.4f}"
+            )
 
 
 if __name__ == "__main__":
