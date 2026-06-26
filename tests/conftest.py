@@ -124,6 +124,16 @@ def _prewarm_jax_compilation_cache():
         compilation_cache._initialize_cache()
 
 
+@pytest.fixture(scope="session", autouse=True)
+def _init_jax_distributed():
+    """Initializes the JAX distributed system for multi-host TPU execution."""
+    import jax
+    try:
+        jax.distributed.initialize()
+    except Exception:
+        pass
+
+
 @pytest.fixture(autouse=True)
 def _handle_disable_jax_cache_marker(request):
     """
