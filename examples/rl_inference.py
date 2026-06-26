@@ -23,21 +23,21 @@ logger = init_logger(__name__)
 
 
 def main():
-    # Read the benchmark dataset to get 128 prompts (for concurrency 128)
+    # Read the benchmark dataset to get prompts based on concurrency variable
+    concurrency = int(os.environ.get("CONCURRENCY", "128"))
     prompts = []
     dataset_path = "/home/karangoel_google_com/benchmarks/datasets/bench_2000_500.jsonl"
 
     if os.path.exists(dataset_path):
         with open(dataset_path, "r") as f:
             for i, line in enumerate(f):
-                if i >= 128:  # Grab 128 prompts
+                if i >= concurrency:
                     break
                 data = json.loads(line)
                 prompts.append(data["prompt"])
     else:
         # Fallback if dataset isn't generated yet
-        prompts = ["Hello, this is a test prompt to check expert routing."
-                   ] * 128
+        prompts = ["Hello, this is a test prompt to check expert routing."] * concurrency
 
     print(f"Loaded {len(prompts)} prompts. Initializing LLM...")
 
