@@ -179,6 +179,9 @@ class PallasMLAttentionBackendImpl(MLAAttentionImpl):
                                   k_pe,
                                   value=None,
                                   k_scale=k_scale)
+        else:
+            q_pe = q_pe.astype(input_dtype)
+            k_pe = k_pe.astype(input_dtype)
         k_pe = k_pe.squeeze(1)
         new_kv_cache, outputs = mla_attention(
             q_nope,
