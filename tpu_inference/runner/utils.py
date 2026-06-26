@@ -574,13 +574,7 @@ class PhasedBasedProfiler:
                       PHASED_PROFILER_DECODE_ONLY_KV_LEN_THRESHOLD))
         self.profile_dir: str = profile_dir
         # NOTE: we purposely don't have AMBIGUOUS here
-        self.inference_phase_seen: dict = {
-            InferencePhase.PREFILL_ONLY: False,
-            InferencePhase.PREFILL_HEAVY: False,
-            InferencePhase.DECODE_ONLY: False,
-            InferencePhase.DECODE_HEAVY: False,
-            InferencePhase.BALANCED: False
-        }
+        self.inference_phases_profiled: set = set()
         self.default_profiling_options = jax.profiler.ProfileOptions()
         self.default_profiling_options.python_tracer_level = envs.PYTHON_TRACER_LEVEL
         self.default_profiling_options.advanced_configuration = {
@@ -644,8 +638,11 @@ class PhasedBasedProfiler:
         """
         current_determined_phase = determine_phase_from_batch_composition_stats(
             batch_composition_stats)
-        for phase, has_been_seen in self.inference_phase_seen.items():
-            if has_been_seen or phase != current_determined_phase:
+        num_reqs = batch_composition_stats.get("num_reqs", 0)
+        for phase in InferencePhase:
+            if (
+                    phase, num_reqs
+            ) in self.inference_phases_profiled or phase != current_determined_phase:
                 continue
 
             # Skip a configurable number of decode-heavy steps before profiling
@@ -667,10 +664,10 @@ class PhasedBasedProfiler:
                         min_kv_len, self.decode_kv_len_threshold)
                     break
 
-            self.inference_phase_seen[phase] = True
+            self.inference_phases_profiled.add((phase, num_reqs))
             self.profiling_n_steps_left = self.num_steps_to_profile_for
 
-            self.current_phase = phase.name.lower()
+            self.current_phase = f"{phase.name.lower()}_concur_{batch_composition_stats.get('num_reqs', 0)}"
 
             logger.info(f"Starting profiling for {self.current_phase} phase")
             logger.info(f"Batch composition stats: {batch_composition_stats}")
@@ -848,12 +845,9 @@ class PhasedBasedProfiler:
                     phase: The phase of the inference the batch is in.
         """
 
-        have_seen_all_phases = all(self.inference_phase_seen.values())
-        # We want to start profiling only after the first trial request
         is_past_initial_request = batch_composition_stats[
-            "total_num_scheduled_tokens"] > 1
-        if is_past_initial_request and (not have_seen_all_phases
-                                        or self.current_phase != ""):
+            "total_num_scheduled_tokens"] >= 1
+        if is_past_initial_request:
             # We haven't started profiling yet
             if self.profiling_n_steps_left <= 0:
                 self._start_profiling(batch_composition_stats)
