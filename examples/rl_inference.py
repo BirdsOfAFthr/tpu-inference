@@ -49,7 +49,7 @@ def main():
         max_num_batched_tokens=2048,
         max_num_seqs=8,  # Adjusted to 128 to allow concurrency 128
         enable_prefix_caching=False,
-        tensor_parallel_size=8,
+        tensor_parallel_size=16,
         kv_cache_dtype="fp8",
         async_scheduling=False,  # --no-async-scheduling
         gpu_memory_utilization=0.90,
