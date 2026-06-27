@@ -32,10 +32,10 @@ logging.disable(logging.WARNING)
 # ==============================================================================
 # CONFIGURATION
 # ==============================================================================
-MODEL_PATH = "/mnt/data/hf/hub/models--mistralai--Mistral-Large-3-675B-Instruct-2512/snapshots/5bb3d32a0a147594527f38cb136a8390eaa82222"
+MODEL_PATH = "/mnt/disks/persist/hf/hub/models--mistralai--Mistral-Large-3-675B-Instruct-2512/snapshots/5bb3d32a0a147594527f38cb136a8390eaa82222"
 SERVED_MODEL_NAME = "mistralai/Mistral-Large-3-675B-Instruct-2512"
 SERVER_URL = "http://localhost:8000"
-SHAREGPT_FILE = "/mnt/data/hf/ShareGPT_V3_unfiltered_cleaned_split.json"
+SHAREGPT_FILE = "/mnt/disks/persist/hf/ShareGPT_V3_unfiltered_cleaned_split.json"
 
 RESULTS_DIR = Path("benchmark_results")
 DATASETS_DIR = Path("datasets")

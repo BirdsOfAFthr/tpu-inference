@@ -378,11 +378,11 @@ tuned_params_mapping: dict[TuningKey, TunableParams] = {
 
 def get_tuned_params(tuning_key: TuningKey) -> TunableParams:
     if tuning_key in tuned_params_mapping:
-        logger.warning("amanda using tuned params")
+        logger.warning("amanda repro tp branch: using tuned params")
         return tuned_params_mapping[tuning_key]
     else:
         logger.warning(
-            f"No tuned parameters found for the given tuning key: {tuning_key}, using default parameters"
+            f"amanda repro tp branch: No tuned parameters found for the given tuning key: {tuning_key}, using default parameters"
         )
         return TunableParams(
             decode_batch_size=4,
