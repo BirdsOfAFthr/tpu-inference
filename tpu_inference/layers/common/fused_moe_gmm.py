@@ -23,7 +23,8 @@ from jax.sharding import PartitionSpec as P
 import tpu_inference.envs as envs
 from tpu_inference.kernels.collectives import \
     hierarchical_reduce_scatter as hier_rs
-from tpu_inference.kernels.megablox.gmm_v2 import gmm_v2
+from tpu_inference.kernels.megablox.gmm_v2 import (TileSizes, calculate_tiling,
+                                                   gmm_v2)
 from tpu_inference.kernels.sparse_core.dense_gather_reduce import \
     dense_gather_reduce
 from tpu_inference.kernels.sparse_core.ragged_gather import \
@@ -127,7 +128,8 @@ def gmm_wrapper(lhs,
                 group_sizes,
                 group_offset,
                 fuse_act=None,
-                preferred_element_type=None):
+                preferred_element_type=None,
+                tile_info=calculate_tiling):
     gmm_res = gmm_v2(
         lhs=lhs,
         rhs=rhs,
@@ -138,6 +140,7 @@ def gmm_wrapper(lhs,
         zero_initialize=False,
         fuse_act=fuse_act,
         preferred_element_type=preferred_element_type,
+        tile_info=tile_info,
     )
     return gmm_res
 
@@ -197,13 +200,28 @@ def moe_gmm_local(x: jax.Array,
                   enable_rs_kernel: bool = False,
                   onehot_moe_permute_threshold: int = 0,
                   scatter_results: bool = False,
-                  moe_chunk_size: int = 0) -> jax.Array:
+                  moe_chunk_size: int = 0,
+                  use_ep: bool = False) -> jax.Array:
     """Main MoE logic on a local shard can run in TP or EP mode.
 
     Set parallelism for "tp" or "ep"
     """
 
     assert parallelism in ["tp", "ep"]
+
+    # Define your custom hardcoded tiling configs directly here (e.g., TileSizes(tile_m=128, tile_k=128, tile_n=128))
+    m = x.shape[0]
+    is_decode = (m <= 512)
+    if is_decode or use_ep:
+        # decode tiling config
+        gmm1_tiling = calculate_tiling
+        gmm2_tiling = calculate_tiling
+    else:
+        # prefill tiling config
+        gmm1_tiling = TileSizes(tile_m=512, tile_k=7168,
+                                tile_n=256)  # xid/259725198
+        gmm2_tiling = TileSizes(tile_m=512, tile_k=256,
+                                tile_n=7168)  # xid/259805054
 
     # GMM1 computes x @ (W_up | W_gate) together and activation, output is [tokens,padded_intermediate_size]
     gmm1_res = gmm_wrapper(
@@ -215,6 +233,7 @@ def moe_gmm_local(x: jax.Array,
         group_offset,
         fuse_act=activation,
         preferred_element_type=x.dtype,
+        tile_info=gmm1_tiling,
     )
 
     # When the parallelism is TP since w2_bias is not sharded, we should only apply bias
@@ -224,8 +243,13 @@ def moe_gmm_local(x: jax.Array,
         shard_id = jax.lax.axis_index(ShardingAxisName.MLP_TENSOR).sum()
         w2_bias = jnp.where(shard_id == 0, w2_bias, 0)
     gmm1_res = gmm1_res[:, :w2.shape[1]]  # trim to hidden size if padded
-    gmm2_res = gmm_wrapper(gmm1_res, w2, w2_scale, w2_bias, group_sizes,
-                           group_offset)
+    gmm2_res = gmm_wrapper(gmm1_res,
+                           w2,
+                           w2_scale,
+                           w2_bias,
+                           group_sizes,
+                           group_offset,
+                           tile_info=gmm2_tiling)
 
     batch_size = gmm2_res.shape[0]
     local_group_size = w1.shape[0]
@@ -501,6 +525,7 @@ def expert_parallel_gmm(
             enable_rs_kernel=enable_rs_kernel,
             scatter_results=scatter_results,
             moe_chunk_size=moe_chunk_size,
+            use_ep=True,
         ),
         mesh=mesh,
         in_specs=(

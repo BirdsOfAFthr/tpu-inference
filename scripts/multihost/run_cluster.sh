@@ -90,8 +90,8 @@ fi
 
 # Set up Docker authentication for Google Container Registry.
 # Modify the hostname to accomodate your specific docker region.
-gcloud auth configure-docker us-east5-docker.pkg.dev
-gcloud auth configure-docker us-central1-docker.pkg.dev
+gcloud auth configure-docker us-east5-docker.pkg.dev --quiet
+gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
 
 CONTAINER_NAME="node"
 
@@ -101,7 +101,7 @@ cleanup() {
     docker stop "${CONTAINER_NAME}"
     docker rm "${CONTAINER_NAME}"
 }
-trap cleanup EXIT
+# trap cleanup EXIT
 
 # Build the Ray start command based on the node role.
 # The head node manages the cluster and accepts connections on port 6379,
@@ -121,8 +121,8 @@ fi
 
 # Force cleanup of the image to ensure we pull the absolute latest
 echo "Ensuring we have the latest image for ${DOCKER_IMAGE}..."
-docker rmi "${DOCKER_IMAGE}" > /dev/null 2>&1 || true
-docker pull "${DOCKER_IMAGE}"
+# docker rmi "${DOCKER_IMAGE}" > /dev/null 2>&1 || true
+# docker pull "${DOCKER_IMAGE}"
  
 
 # Default to no gcloud mount
