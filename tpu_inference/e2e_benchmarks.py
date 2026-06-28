@@ -37,7 +37,8 @@ SERVED_MODEL_NAME = "mistralai/Mistral-Large-3-675B-Instruct-2512"
 SERVER_URL = "http://localhost:8000"
 SHAREGPT_FILE = "/mnt/data/hf/ShareGPT_V3_unfiltered_cleaned_split.json"
 
-RESULTS_DIR = Path("benchmark_results")
+RESULTS_DIR = Path("/mnt/data/benchmark_results") if os.path.exists(
+    "/mnt/data") else Path.home() / "benchmark_results"
 DATASETS_DIR = Path("datasets")
 RESULTS_DIR.mkdir(exist_ok=True)
 DATASETS_DIR.mkdir(exist_ok=True)
@@ -50,7 +51,7 @@ PROFILES = [
     },
 ]
 # Reversed order to compile the largest batch size first
-CONCURRENCIES = [128, 64, 32, 16, 8, 4, 2, 1]
+CONCURRENCIES = [128, 128, 128, 128, 128]
 
 # Generate a single unique timestamp directory for this entire run session
 RUN_TIMESTAMP = datetime.now().strftime("%Y%m%d_%H%M%S")
