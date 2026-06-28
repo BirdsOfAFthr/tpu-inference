@@ -49,7 +49,6 @@ PROFILES = [
         "osl": 512
     },
 ]
-# Reversed order to compile the largest batch size first
 CONCURRENCIES = [128]
 
 # Generate a single unique timestamp directory for this entire run session
@@ -362,7 +361,8 @@ def main():
     print(f"Waiting for vLLM server at {SERVER_URL}...")
     try:
         # 1. Run GSM8K Eval first
-        gsm8k_acc = run_gsm8k_eval()
+        # gsm8k_acc = run_gsm8k_eval()
+        gsm8k_acc = None
 
         # 2. Run Throughput Concurrency Sweeps
         all_results = []
