@@ -544,7 +544,7 @@ def mla_attention(
     )
 
     def _mla_ragged_paged_attention(q, q_rope, k, k_rope, cache, *args):
-        dp_size = get_mesh_shape_product(mesh, ShardingAxisName.ATTN_DATA)
+        dp_size = get_mesh_shape_product(mesh, ShardingAxisName.BATCH)
         batched_decode_tuning_key = TuningKey(
             case="batched_decode",
             max_num_tokens=q.shape[1],
