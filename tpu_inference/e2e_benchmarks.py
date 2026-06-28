@@ -361,8 +361,8 @@ def main():
     print(f"Waiting for vLLM server at {SERVER_URL}...")
     try:
         # 1. Run GSM8K Eval first
-        # gsm8k_acc = run_gsm8k_eval()
-        gsm8k_acc = None
+        gsm8k_acc = run_gsm8k_eval()
+        return
 
         # 2. Run Throughput Concurrency Sweeps
         all_results = []
