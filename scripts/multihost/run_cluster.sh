@@ -90,8 +90,10 @@ fi
 
 # Set up Docker authentication for Google Container Registry.
 # Modify the hostname to accomodate your specific docker region.
-gcloud auth configure-docker us-east5-docker.pkg.dev --quiet
-gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
+if [ -z "${TOKEN}" ]; then
+    gcloud auth configure-docker us-east5-docker.pkg.dev --quiet
+    gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
+fi
 
 CONTAINER_NAME="node"
 
