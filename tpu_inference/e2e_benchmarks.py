@@ -333,10 +333,9 @@ def plot_results(all_results, gsm8k_acc):
 
     if has_20k:
         # GPU Target: NVIDIA B200 Baseline (20k Context)
-        b200_concurrencies_20k = [1, 2, 4, 8, 16, 32, 64, 128]
         b200_req_min_20k = [11.0, 18.0, 32.0, 42.0, 52.0, 59.0, 61.0, 61.0]
         b200_speed_tok_s_20k = [
-            106.0, 148.1, 265.7, 349.4, 431.6, 496.9, 511.6, 520.1
+            122.2, 108.3, 98.2, 78.0, 57.3, 36.1, 24.8, 24.8
         ]
 
         plt.plot(
@@ -349,7 +348,7 @@ def plot_results(all_results, gsm8k_acc):
             markersize=8,
             color="#bcbd22",
         )
-        for i, c in enumerate(b200_concurrencies_20k):
+        for i, c in enumerate([1, 2, 4, 8, 16, 32, 64, 128]):
             plt.annotate(
                 f"{c}",
                 (b200_speed_tok_s_20k[i], b200_req_min_20k[i]),
