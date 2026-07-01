@@ -295,35 +295,69 @@ def plot_results(all_results, gsm8k_acc):
                 color="#444444",
             )
 
-    # GPU Target: NVIDIA B200 Baseline
-    b200_concurrencies = [1, 2, 4, 8, 16, 32, 64, 128]
-    b200_tok_s = [131.1, 231.2, 426.1, 596.3, 1052.3, 1553.7, 2233.6, 3141.3]
-    b200_req_min = [tok * (60.0 / 512.0) for tok in b200_tok_s]
-    b200_itl_ms = [7.45, 8.38, 9.04, 12.51, 14.23, 19.36, 27.31, 38.94]
-    b200_speed_tok_s = [1000.0 / itl for itl in b200_itl_ms]
+    # Determine which B200 target baseline curves to draw
+    has_20k = any(p["isl"] >= 10000 for p in PROFILES)
+    has_2k = any(p["isl"] < 10000 for p in PROFILES)
 
-    plt.plot(
-        b200_speed_tok_s,
-        b200_req_min,
-        label="GPU Target: NVIDIA B200",
-        marker="s",
-        linestyle="--",
-        linewidth=2,
-        markersize=8,
-        color="#d62728",
-    )
+    if has_2k:
+        # GPU Target: NVIDIA B200 Baseline (2k Context - P50 Speed)
+        b200_concurrencies = [1, 2, 4, 8, 16, 32, 64, 128]
+        b200_req_min = [
+            15.732, 27.744, 51.132, 71.556, 126.276, 186.444, 268.032, 376.956
+        ]
+        b200_speed_tok_s = [134.2, 121.0, 112.0, 95.0, 76.5, 58.0, 44.0, 36.6]
 
-    for i, c in enumerate(b200_concurrencies):
-        plt.annotate(
-            f"{c}",
-            (b200_speed_tok_s[i], b200_req_min[i]),
-            textcoords="offset points",
-            xytext=(0, 8),
-            ha="center",
-            fontsize=9,
-            fontweight="bold",
+        plt.plot(
+            b200_speed_tok_s,
+            b200_req_min,
+            label="GPU Target: NVIDIA B200 (2k/512)",
+            marker="s",
+            linestyle="--",
+            linewidth=2,
+            markersize=8,
             color="#d62728",
         )
+        for i, c in enumerate(b200_concurrencies):
+            plt.annotate(
+                f"{c}",
+                (b200_speed_tok_s[i], b200_req_min[i]),
+                textcoords="offset points",
+                xytext=(0, 8),
+                ha="center",
+                fontsize=9,
+                fontweight="bold",
+                color="#d62728",
+            )
+
+    if has_20k:
+        # GPU Target: NVIDIA B200 Baseline (20k Context)
+        b200_concurrencies_20k = [1, 2, 4, 8, 16, 32, 64, 128]
+        b200_req_min_20k = [11.0, 18.0, 32.0, 42.0, 52.0, 59.0, 61.0, 61.0]
+        b200_speed_tok_s_20k = [
+            122.2, 108.3, 98.2, 78.0, 57.3, 36.1, 24.8, 24.8
+        ]
+
+        plt.plot(
+            b200_speed_tok_s_20k,
+            b200_req_min_20k,
+            label="GPU Target: NVIDIA B200 (20k/512)",
+            marker="d",
+            linestyle=":",
+            linewidth=2,
+            markersize=8,
+            color="#bcbd22",
+        )
+        for i, c in enumerate(b200_concurrencies_20k):
+            plt.annotate(
+                f"{c}",
+                (b200_speed_tok_s_20k[i], b200_req_min_20k[i]),
+                textcoords="offset points",
+                xytext=(0, 8),
+                ha="center",
+                fontsize=9,
+                fontweight="bold",
+                color="#bcbd22",
+            )
 
     plt.xlabel("P50 Speed (tok/s)", fontsize=12)
     plt.ylabel("Request Throughput (req/min)", fontsize=12)
