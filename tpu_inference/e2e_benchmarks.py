@@ -51,7 +51,7 @@ PROFILES = [
     },
 ]
 # Reversed order to compile the largest batch size first
-CONCURRENCIES = [128, 128, 128, 128, 128]
+CONCURRENCIES = [1, 2, 4, 8, 16, 32, 64, 128]
 
 # Generate a single unique timestamp directory for this entire run session
 RUN_TIMESTAMP = datetime.now().strftime("%Y%m%d_%H%M%S")
