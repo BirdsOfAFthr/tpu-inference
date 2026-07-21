@@ -285,7 +285,8 @@ class TpuPlatform(Platform):
 
         cache_config = vllm_config.cache_config
         # For v0, the default block size is 16.
-        if cache_config and not cache_config.user_specified_block_size:
+        if cache_config and not getattr(cache_config,
+                                        "user_specified_block_size", False):
             if vllm_config.model_config:
                 if vllm_config.model_config.use_mla:
                     from tpu_inference.layers.vllm.backends.flash_attn_mla import \
