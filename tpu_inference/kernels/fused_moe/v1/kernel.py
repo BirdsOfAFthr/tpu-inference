@@ -1272,12 +1272,8 @@ def fused_ep_moe(
     bd2c: int | None = None,
     ep_axis_name: str = "model",
 ):
-    # TODO(jevinjiang): move all these assertions to validation function.
-    if len(mesh.shape) != 2:
-        raise NotImplementedError("Only 2D mesh is supported.")
-
     for axis_name in mesh.axis_names:
-        if axis_name == ep_axis_name:
+        if axis_name == ep_axis_name or "attn_dp" in axis_name:
             continue
         if mesh.shape[axis_name] != 1:
             raise NotImplementedError(
@@ -1636,9 +1632,16 @@ def fused_ep_moe(
         name=scope_name,
     )
 
+    if len(mesh.shape) != 2:
+        devices_2d = mesh.devices.reshape(-1, ep_size)
+        mesh_2d = jax.sharding.Mesh(devices_2d,
+                                    axis_names=("data", ep_axis_name))
+    else:
+        mesh_2d = mesh
+
     @jax.jit
     @jax.shard_map(
-        mesh=mesh,
+        mesh=mesh_2d,
         in_specs=(
             P(ep_axis_name),  # tokens_hbm
             P(ep_axis_name),  # w1_hbm
