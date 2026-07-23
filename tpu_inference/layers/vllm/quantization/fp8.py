@@ -13,7 +13,15 @@
 # limitations under the License.
 
 import gc
+import resource
 from typing import Optional, Union
+
+
+from tpu_inference.utils import t2j
+
+def _get_rss_gb() -> float:
+    return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / (1024 * 1024)
+
 
 import jax
 import jax.numpy as jnp
@@ -163,8 +171,7 @@ class VllmFp8LinearMethod(
             layer._loaded_weights.add(param_name)
 
         if len(layer._loaded_weights) == self.linear_config.num_proj * len(
-            dict(layer.named_parameters(recurse=False))
-        ):
+                dict(layer.named_parameters(recurse=False))):
             layer_name = getattr(layer, "layer_name", type(layer).__name__)
             logger.info(
                 "amanda VllmFp8LinearMethod Processing weights for layer"
@@ -204,9 +211,7 @@ class VllmFp8LinearMethod(
             PartitionSpec(*self.linear_config.weight_sharding[::-1]),
         )
         layer_name = getattr(layer, "layer_name", type(layer).__name__)
-        logger.info(
-            f"amanda MEM_DEBUG Linear [{layer_name}] 1. Start:"
-        )
+        logger.info(f"amanda MEM_DEBUG Linear [{layer_name}] 1. Start:")
 
         p_weight = layer.weight
         p_scale = getattr(
@@ -224,9 +229,8 @@ class VllmFp8LinearMethod(
             # TODO: consider get rid of the f32 conversion, to optimize the HBM usage.
             if weight_scale_inv.dtype == torch.float8_e8m0fnu:
                 layer.weight_scale_inv = weight_scale_inv.to(torch.float32)
-            weight_scale = _load_weight_for_layer(
-                layer, "weight_scale_inv", loading_sharding
-            )
+            weight_scale = _load_weight_for_layer(layer, "weight_scale_inv",
+                                                  loading_sharding)
             weight_scale = jnp.transpose(weight_scale)
             if p_scale is not None:
                 p_scale.set_(torch.storage.UntypedStorage())
@@ -236,9 +240,8 @@ class VllmFp8LinearMethod(
             if weight_scale_tensor.dtype == torch.float8_e8m0fnu:
                 layer.weight_scale = weight_scale_tensor.to(torch.float32)
             scale_sharding = NamedSharding(self.linear_config.mesh, P(None))
-            weight_scale = _load_weight_for_layer(
-                layer, "weight_scale", scale_sharding
-            )
+            weight_scale = _load_weight_for_layer(layer, "weight_scale",
+                                                  scale_sharding)
             if p_scale is not None:
                 p_scale.set_(torch.storage.UntypedStorage())
             delattr(layer, "weight_scale")
@@ -290,8 +293,7 @@ class VllmFp8LinearMethod(
             )
         logger.info(
             f"amanda MEM_DEBUG Linear [{layer_name}] 3. Processed linear weights:"
-            f" RSS={_get_rss_gb():.2f} GB"
-        )
+            f" RSS={_get_rss_gb():.2f} GB")
 
         has_bias = bias is not None
         del weight, weight_scale, bias
