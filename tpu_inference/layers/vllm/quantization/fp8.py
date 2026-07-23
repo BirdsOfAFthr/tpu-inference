@@ -340,23 +340,25 @@ class VllmFp8LinearMethod(
               layer: torch.nn.Module,
               x: torch.Tensor,
               bias: Optional[torch.Tensor] = None) -> torch.Tensor:
+        scale_name = "weight_scale_inv" if self.block_quant else "weight_scale"
         with jax.named_scope(layer._get_name()):
             x_jax = jax_view(x)
             bias_jax = jax_view(
                 bias) if bias is not None and not layer.skip_bias_add else None
             if self.linear_config.fuse_matmuls:
                 weight_jax = jax_view(layer.weight)
-                weight_scale_jax = jax_view(layer.weight_scale)
+                weight_scale_jax = jax_view(getattr(layer, scale_name))
                 out = self._apply_fused(x_jax, weight_jax, weight_scale_jax,
                                         bias_jax)
             else:
                 assert isinstance(layer.weight, torch.nn.ParameterList)
-                assert isinstance(layer.weight_scale, torch.nn.ParameterList)
+                scale_params = getattr(layer, scale_name)
+                assert isinstance(scale_params, torch.nn.ParameterList)
                 # jax_view cannot handle ParameterList directly, so we explicitly
                 # convert them to list of jax.Array.
                 weight_and_scale = [
                     (jax_view(w), jax_view(s))
-                    for w, s in zip(layer.weight, layer.weight_scale)
+                    for w, s in zip(layer.weight, scale_params)
                 ]
                 if bias is not None and not layer.skip_bias_add:
                     assert isinstance(bias, torch.nn.ParameterList)
